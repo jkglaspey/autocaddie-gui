@@ -11,7 +11,7 @@ from tkinter import Tk, Canvas, Entry, Text, Button, PhotoImage
 
 
 OUTPUT_PATH = Path(__file__).parent
-ASSETS_PATH = OUTPUT_PATH / Path(r"C:\Users\9digg\Dropbox\My PC (LAPTOP-L96AEBF1)\Desktop\AutoCaddie\GUI\src\gui_module\build\assets\frame8")
+ASSETS_PATH = OUTPUT_PATH / Path(r".\assets\frame6")
 
 
 def relative_to_assets(path: str) -> Path:
@@ -51,6 +51,15 @@ canvas.create_rectangle(
     fill="#45AC2B",
     outline="")
 
+canvas.create_text(
+    32.0,
+    276.0,
+    anchor="nw",
+    text="VIDEO 1\n<RECORDING>",
+    fill="#FFFFFF",
+    font=("Inter", 24 * -1)
+)
+
 canvas.create_rectangle(
     411.0,
     192.0,
@@ -60,56 +69,21 @@ canvas.create_rectangle(
     outline="")
 
 canvas.create_text(
-    511.0,
-    273.0,
+    427.0,
+    276.0,
     anchor="nw",
-    text="VIDEO 2\n<RECORDING>",
+    text="<REPLACE WITH ALL ANGLES TIMELINE>",
     fill="#FFFFFF",
     font=("Inter", 24 * -1)
 )
 
 canvas.create_rectangle(
-    16.2652587890625,
+    229.0,
     48.0,
-    386.2652587890625,
-    176.0,
-    fill="#FF0000",
-    outline="")
-
-canvas.create_rectangle(
-    411.0,
-    48.0,
-    781.0,
-    176.0,
+    569.0,
+    113.0,
     fill="#FFFFFF",
     outline="")
-
-canvas.create_text(
-    116.0,
-    79.0,
-    anchor="nw",
-    text="STATUS\n<RECORDING>",
-    fill="#FFFFFF",
-    font=("Inter", 24 * -1)
-)
-
-canvas.create_text(
-    511.0,
-    79.0,
-    anchor="nw",
-    text="MCU <RECORDING>",
-    fill="#000000",
-    font=("Inter", 24 * -1)
-)
-
-canvas.create_text(
-    110.0,
-    273.0,
-    anchor="nw",
-    text="VIDEO 1\n<RECORDING>",
-    fill="#FFFFFF",
-    font=("Inter", 24 * -1)
-)
 
 canvas.create_text(
     16.0,
@@ -118,6 +92,31 @@ canvas.create_text(
     text="AutoCaddie",
     fill="#1E1E1E",
     font=("Inter SemiBold", 24 * -1)
+)
+
+canvas.create_text(
+    347.0,
+    69.0,
+    anchor="nw",
+    text="RESULTS",
+    fill="#000000",
+    font=("Inter", 24 * -1)
+)
+
+button_image_1 = PhotoImage(
+    file=relative_to_assets("button_1.png"))
+button_1 = Button(
+    image=button_image_1,
+    borderwidth=0,
+    highlightthickness=0,
+    command=lambda: print("button_1 clicked"),
+    relief="flat"
+)
+button_1.place(
+    x=657.0,
+    y=48.0,
+    width=92.0,
+    height=72.0
 )
 window.resizable(False, False)
 window.mainloop()

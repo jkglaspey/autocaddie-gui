@@ -1,7 +1,7 @@
 import cv2
 from find_valid_camera_indices import find_camera_indices
 
-def extract_frames(camera_indices, duration=3):
+def extract_frames(camera_indices, duration=30):
 
     # Initialize lists for each camera
     cameras = [cv2.VideoCapture(idx) for idx in camera_indices]

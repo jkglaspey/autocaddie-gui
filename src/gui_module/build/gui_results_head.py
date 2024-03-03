@@ -11,7 +11,7 @@ from tkinter import Tk, Canvas, Entry, Text, Button, PhotoImage
 
 
 OUTPUT_PATH = Path(__file__).parent
-ASSETS_PATH = OUTPUT_PATH / Path(r"C:\Users\9digg\Dropbox\My PC (LAPTOP-L96AEBF1)\Desktop\AutoCaddie\GUI\src\gui_module\build\assets\frame4")
+ASSETS_PATH = OUTPUT_PATH / Path(r".\assets\frame3")
 
 
 def relative_to_assets(path: str) -> Path:
@@ -86,12 +86,21 @@ canvas.create_rectangle(
     outline="")
 
 canvas.create_text(
-    310.0,
+    273.0,
     69.0,
     anchor="nw",
-    text="FORWARD ARM",
+    text="HEAD STRAIGHTNESS",
     fill="#000000",
     font=("Inter", 24 * -1)
+)
+
+canvas.create_text(
+    16.0,
+    12.0,
+    anchor="nw",
+    text="AutoCaddie",
+    fill="#1E1E1E",
+    font=("Inter SemiBold", 24 * -1)
 )
 
 button_image_1 = PhotoImage(
@@ -124,15 +133,6 @@ button_2.place(
     y=48.0,
     width=92.0,
     height=72.0
-)
-
-canvas.create_text(
-    16.0,
-    12.0,
-    anchor="nw",
-    text="AutoCaddie",
-    fill="#1E1E1E",
-    font=("Inter SemiBold", 24 * -1)
 )
 
 canvas.create_text(

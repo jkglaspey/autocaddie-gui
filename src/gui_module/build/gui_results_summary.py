@@ -11,7 +11,7 @@ from tkinter import Tk, Canvas, Entry, Text, Button, PhotoImage
 
 
 OUTPUT_PATH = Path(__file__).parent
-ASSETS_PATH = OUTPUT_PATH / Path(r"C:\Users\9digg\Dropbox\My PC (LAPTOP-L96AEBF1)\Desktop\AutoCaddie\GUI\src\gui_module\build\assets\frame0")
+ASSETS_PATH = OUTPUT_PATH / Path(r".\assets\frame5")
 
 
 def relative_to_assets(path: str) -> Path:
@@ -44,36 +44,71 @@ image_1 = canvas.create_image(
 )
 
 canvas.create_rectangle(
-    411.0,
-    132.0,
-    596.0,
+    16.0,
+    192.0,
+    386.0,
     432.0,
-    fill="#45AC2C",
+    fill="#1E1E1E",
     outline="")
 
 canvas.create_text(
-    427.0,
-    228.0,
+    44.0,
+    338.0,
     anchor="nw",
-    text="<REPLACE WITH USER FOOTAGE>",
+    text="PROJECTED BALL SPEED: XX mph",
     fill="#FFFFFF",
-    font=("Inter", 24 * -1)
+    font=("Inter", 20 * -1)
+)
+
+canvas.create_text(
+    98.0,
+    302.0,
+    anchor="nw",
+    text="SWING MAX SPEED: XX mph",
+    fill="#FFFFFF",
+    font=("Inter", 20 * -1)
+)
+
+canvas.create_text(
+    152.0,
+    266.0,
+    anchor="nw",
+    text="SWING DURATION: X s",
+    fill="#FFFFFF",
+    font=("Inter", 20 * -1)
 )
 
 canvas.create_rectangle(
-    596.0,
-    132.0,
+    411.0,
+    192.0,
     781.0,
     432.0,
     fill="#45AC2C",
     outline="")
 
 canvas.create_text(
-    612.0,
-    210.0,
+    427.0,
+    276.0,
     anchor="nw",
-    text="<REPLACE WITH GOLFDB FOOTAGE>",
+    text="VIDEO 2\n<RECORDING>",
     fill="#FFFFFF",
+    font=("Inter", 24 * -1)
+)
+
+canvas.create_rectangle(
+    229.0,
+    48.0,
+    569.0,
+    113.0,
+    fill="#FFFFFF",
+    outline="")
+
+canvas.create_text(
+    295.0,
+    69.0,
+    anchor="nw",
+    text="SWING SUMMARY",
+    fill="#000000",
     font=("Inter", 24 * -1)
 )
 
@@ -86,23 +121,6 @@ canvas.create_text(
     font=("Inter SemiBold", 24 * -1)
 )
 
-canvas.create_rectangle(
-    229.0,
-    48.0,
-    569.0,
-    113.0,
-    fill="#FFFFFF",
-    outline="")
-
-canvas.create_text(
-    332.0,
-    69.0,
-    anchor="nw",
-    text="FEEDBACK",
-    fill="#000000",
-    font=("Inter", 24 * -1)
-)
-
 button_image_1 = PhotoImage(
     file=relative_to_assets("button_1.png"))
 button_1 = Button(
@@ -113,10 +131,10 @@ button_1 = Button(
     relief="flat"
 )
 button_1.place(
-    x=16.0,
-    y=132.0,
-    width=370.0,
-    height=300.0
+    x=48.0,
+    y=48.0,
+    width=92.0,
+    height=72.0
 )
 
 button_image_2 = PhotoImage(
@@ -129,42 +147,10 @@ button_2 = Button(
     relief="flat"
 )
 button_2.place(
-    x=48.0,
+    x=657.0,
     y=48.0,
     width=92.0,
     height=72.0
-)
-
-button_image_3 = PhotoImage(
-    file=relative_to_assets("button_3.png"))
-button_3 = Button(
-    image=button_image_3,
-    borderwidth=0,
-    highlightthickness=0,
-    command=lambda: print("button_3 clicked"),
-    relief="flat"
-)
-button_3.place(
-    x=590.0,
-    y=44.0,
-    width=94.0,
-    height=74.0
-)
-
-button_image_4 = PhotoImage(
-    file=relative_to_assets("button_4.png"))
-button_4 = Button(
-    image=button_image_4,
-    borderwidth=0,
-    highlightthickness=0,
-    command=lambda: print("button_4 clicked"),
-    relief="flat"
-)
-button_4.place(
-    x=688.0,
-    y=40.0,
-    width=77.0,
-    height=78.0
 )
 window.resizable(False, False)
 window.mainloop()

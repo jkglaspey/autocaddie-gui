@@ -11,7 +11,7 @@ from tkinter import Tk, Canvas, Entry, Text, Button, PhotoImage
 
 
 OUTPUT_PATH = Path(__file__).parent
-ASSETS_PATH = OUTPUT_PATH / Path(r"C:\Users\9digg\Dropbox\My PC (LAPTOP-L96AEBF1)\Desktop\AutoCaddie\GUI\src\gui_module\build\assets\frame6")
+ASSETS_PATH = OUTPUT_PATH / Path(r".\assets\frame1")
 
 
 def relative_to_assets(path: str) -> Path:
@@ -70,10 +70,19 @@ canvas.create_rectangle(
 
 canvas.create_text(
     427.0,
-    276.0,
+    294.0,
     anchor="nw",
-    text="<REPLACE WITH ALL ANGLES TIMELINE>",
+    text="<REPLACE WITH GRAPH>",
     fill="#FFFFFF",
+    font=("Inter", 24 * -1)
+)
+
+canvas.create_text(
+    319.0,
+    120.0,
+    anchor="nw",
+    text="Score: XX.XX%",
+    fill="#1E1E1E",
     font=("Inter", 24 * -1)
 )
 
@@ -84,24 +93,6 @@ canvas.create_rectangle(
     113.0,
     fill="#FFFFFF",
     outline="")
-
-canvas.create_text(
-    16.0,
-    12.0,
-    anchor="nw",
-    text="AutoCaddie",
-    fill="#1E1E1E",
-    font=("Inter SemiBold", 24 * -1)
-)
-
-canvas.create_text(
-    347.0,
-    69.0,
-    anchor="nw",
-    text="RESULTS",
-    fill="#000000",
-    font=("Inter", 24 * -1)
-)
 
 button_image_1 = PhotoImage(
     file=relative_to_assets("button_1.png"))
@@ -117,6 +108,40 @@ button_1.place(
     y=48.0,
     width=92.0,
     height=72.0
+)
+
+button_image_2 = PhotoImage(
+    file=relative_to_assets("button_2.png"))
+button_2 = Button(
+    image=button_image_2,
+    borderwidth=0,
+    highlightthickness=0,
+    command=lambda: print("button_2 clicked"),
+    relief="flat"
+)
+button_2.place(
+    x=48.0,
+    y=48.0,
+    width=92.0,
+    height=72.0
+)
+
+canvas.create_text(
+    274.0,
+    69.0,
+    anchor="nw",
+    text="SHOULDER ROTATION",
+    fill="#000000",
+    font=("Inter", 24 * -1)
+)
+
+canvas.create_text(
+    16.0,
+    12.0,
+    anchor="nw",
+    text="AutoCaddie",
+    fill="#1E1E1E",
+    font=("Inter SemiBold", 24 * -1)
 )
 window.resizable(False, False)
 window.mainloop()

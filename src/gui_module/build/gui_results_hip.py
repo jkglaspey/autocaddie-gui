@@ -11,7 +11,7 @@ from tkinter import Tk, Canvas, Entry, Text, Button, PhotoImage
 
 
 OUTPUT_PATH = Path(__file__).parent
-ASSETS_PATH = OUTPUT_PATH / Path(r"C:\Users\9digg\Dropbox\My PC (LAPTOP-L96AEBF1)\Desktop\AutoCaddie\GUI\src\gui_module\build\assets\frame10")
+ASSETS_PATH = OUTPUT_PATH / Path(r".\assets\frame2")
 
 
 def relative_to_assets(path: str) -> Path:
@@ -43,48 +43,73 @@ image_1 = canvas.create_image(
     image=image_image_1
 )
 
-image_image_2 = PhotoImage(
-    file=relative_to_assets("image_2.png"))
-image_2 = canvas.create_image(
-    476.0,
-    222.0,
-    image=image_image_2
-)
+canvas.create_rectangle(
+    16.0,
+    192.0,
+    386.0,
+    432.0,
+    fill="#45AC2B",
+    outline="")
 
 canvas.create_text(
-    382.0,
-    310.0,
+    32.0,
+    276.0,
     anchor="nw",
-    text="<FILE HERE>",
-    fill="#0070E0",
-    font=("Inter", 30 * -1)
-)
-
-canvas.create_text(
-    281.0,
-    260.0,
-    anchor="nw",
-    text="Offline? Navigate to:",
+    text="VIDEO 1\n<RECORDING>",
     fill="#FFFFFF",
-    font=("Inter", 40 * -1)
+    font=("Inter", 24 * -1)
 )
 
-canvas.create_text(
-    321.0,
-    110.0,
-    anchor="nw",
-    text="<INSERT LINK HERE>",
-    fill="#0070E0",
-    font=("Inter", 30 * -1)
-)
+canvas.create_rectangle(
+    411.0,
+    192.0,
+    781.0,
+    432.0,
+    fill="#45AC2C",
+    outline="")
 
 canvas.create_text(
-    256.0,
-    60.0,
+    427.0,
+    294.0,
     anchor="nw",
-    text="Click the following link:",
+    text="<REPLACE WITH GRAPH>",
     fill="#FFFFFF",
-    font=("Inter", 40 * -1)
+    font=("Inter", 24 * -1)
+)
+
+canvas.create_rectangle(
+    229.0,
+    48.0,
+    569.0,
+    113.0,
+    fill="#FFFFFF",
+    outline="")
+
+canvas.create_text(
+    318.0,
+    69.0,
+    anchor="nw",
+    text="HIP ROTATION",
+    fill="#000000",
+    font=("Inter", 24 * -1)
+)
+
+canvas.create_text(
+    16.0,
+    12.0,
+    anchor="nw",
+    text="AutoCaddie",
+    fill="#1E1E1E",
+    font=("Inter SemiBold", 24 * -1)
+)
+
+canvas.create_text(
+    319.0,
+    120.0,
+    anchor="nw",
+    text="Score: XX.XX%",
+    fill="#1E1E1E",
+    font=("Inter", 24 * -1)
 )
 
 button_image_1 = PhotoImage(
@@ -97,10 +122,26 @@ button_1 = Button(
     relief="flat"
 )
 button_1.place(
-    x=31.0,
-    y=199.0,
-    width=125.0,
-    height=50.0
+    x=48.0,
+    y=48.0,
+    width=92.0,
+    height=72.0
+)
+
+button_image_2 = PhotoImage(
+    file=relative_to_assets("button_2.png"))
+button_2 = Button(
+    image=button_image_2,
+    borderwidth=0,
+    highlightthickness=0,
+    command=lambda: print("button_2 clicked"),
+    relief="flat"
+)
+button_2.place(
+    x=657.0,
+    y=48.0,
+    width=92.0,
+    height=72.0
 )
 window.resizable(False, False)
 window.mainloop()
