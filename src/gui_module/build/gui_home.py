@@ -1,6 +1,6 @@
 from pathlib import Path
-import gui_calibration
-import gui_help
+from gui_module.build import gui_calibration
+from gui_module.build import gui_help
 from tkinter import Tk, Canvas, Button, PhotoImage
 from PIL import Image, ImageTk
 import json
@@ -11,53 +11,63 @@ ASSETS_PATH = OUTPUT_PATH / Path(r".\assets\frame11")
 def relative_to_assets(path: str) -> Path:
     return ASSETS_PATH / Path(path)
 
-def save_window_state(width, height, fullscreen):
-    with open("assets\window_state.json", "w") as f:
-        json.dump({"width": width, "height": height, "fullscreen": fullscreen}, f)
+def save_window_state(width, height, fullscreen, x, y, state):
+    with open(r"gui_module\build\assets\window_state.json", "w") as f:
+        json.dump({"width": width, "height": height, "fullscreen": fullscreen, "x": x, "y": y, "maximized": state}, f)
 
 def load_window_state():
     try:
-        with open("assets\window_state.json", "r") as f:
+        with open(r"gui_module\build\assets\window_state.json", "r") as f:
             return json.load(f)
     except FileNotFoundError:
         return None
     
-def create_window(width, height, fullscreen):
+def create_window(width, height, fullscreen, x, y, maximized):
     window = Tk()
     window.geometry(f"{width}x{height}")
     window.configure(bg="#FFFFFF")
+    window.geometry("+{}+{}".format(x, y))
+
+    # Maximized or fullscreen?
+    if maximized:
+        window.state('zoomed')
     if fullscreen:
         window.attributes("-fullscreen", True)
     
     # Save window state before closing
-    window.protocol("WM_DELETE_WINDOW", lambda: close_window(window))
-
-    center_window(window)
+    window.protocol("WM_DELETE_WINDOW", lambda: close_window(window, width, height, x, y))
     
     return window
 
-def close_window(window):
-    save_window_state(window.winfo_width(), window.winfo_height(), window.attributes("-fullscreen"))
+def close_window(window, width, height, x, y):
+    if window.attributes("-fullscreen") == 0:
+            x, y = get_window_position(window)
+    save_window_state(width, height, window.attributes("-fullscreen"), x, y, window.state() == 'zoomed')
     window.destroy()
 
-def center_window(window):
-    window.update_idletasks()
-    screen_width = window.winfo_screenwidth()
-    screen_height = window.winfo_screenheight()
-    window_width = window.winfo_width()
-    window_height = window.winfo_height()
-    x = (screen_width - window_width) // 2
-    y = (screen_height - window_height) // 2
-    window.geometry("+{}+{}".format(x, y))
+def get_window_position(window):
+    geometry_string = window.geometry()
+    x, y = map(int, geometry_string.split('+')[1:])
+    return x, y
+
+def window_event(window):
+    if window.state() != 'zoomed':
+        return window.winfo_width(), window.winfo_height()
+    else:
+        return 0, 0
 
 def main():
     saved_state = load_window_state()
+    width = 0
+    height = 0
+    x = 0
+    y = 0
     if saved_state:
-        width, height, fullscreen = saved_state["width"], saved_state["height"], saved_state["fullscreen"]
+        width, height, fullscreen, x, y, maximized = saved_state["width"], saved_state["height"], saved_state["fullscreen"], saved_state["x"], saved_state["y"], saved_state["maximized"]
     else:
-        width, height, fullscreen = 797, 448, False
+        width, height, fullscreen, x, y, maximized = 797, 448, False, 0, 0, False
     
-    window = create_window(width, height, fullscreen)
+    window = create_window(width, height, fullscreen, x, y, maximized)
 
     # Fullscreen
     def toggle_fullscreen(event=None):
@@ -108,6 +118,14 @@ def main():
 
     # Resize elements in window
     def resize_canvas(event=None):
+
+        # Window
+        temp_width, temp_height = window_event(window)
+        if temp_width > 0 and temp_height > 0:
+            width = temp_width
+            height = temp_height
+        if window.attributes("-fullscreen") == 0:
+            x, y = get_window_position(window)
 
         # Get the size of the canvas
         canvas_width = canvas.winfo_width()
@@ -165,7 +183,7 @@ def main():
     def press_start_button():
         print("Debug: Start button clicked")
         # Open the window
-        window.destroy()
+        close_window(window, width, height, x, y)
         gui_calibration.main()
 
     # Help button
@@ -183,7 +201,7 @@ def main():
     def press_help_button():
         print("Debug: Help button clicked")
         # Open the window
-        window.destroy()
+        close_window(window, width, height, x, y)
         gui_help.main()
 
     # AutoCaddie title

@@ -4,7 +4,9 @@
 
 
 from pathlib import Path
-import gui_home
+from gui_module.build import gui_home
+import json
+from PIL import Image, ImageTk
 
 # from tkinter import *
 # Explicit imports to satisfy Flake8
@@ -14,17 +16,83 @@ from tkinter import Tk, Canvas, Entry, Text, Button, PhotoImage
 OUTPUT_PATH = Path(__file__).parent
 ASSETS_PATH = OUTPUT_PATH / Path(r".\assets\frame10")
 
-
 def relative_to_assets(path: str) -> Path:
     return ASSETS_PATH / Path(path)
 
-def main():
+def save_window_state(width, height, fullscreen, x, y, state):
+    with open(r"gui_module\build\assets\window_state.json", "w") as f:
+        json.dump({"width": width, "height": height, "fullscreen": fullscreen, "x": x, "y": y, "maximized": state}, f)
+
+def load_window_state():
+    try:
+        with open(r"gui_module\build\assets\window_state.json", "r") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return None
+    
+def create_window(width, height, fullscreen, x, y, maximized):
     window = Tk()
+    window.geometry(f"{width}x{height}")
+    window.configure(bg="#FFFFFF")
+    window.geometry("+{}+{}".format(x, y))
 
-    window.geometry("797x448")
-    window.configure(bg = "#FFFFFF")
+    # Maximized or fullscreen?
+    if maximized:
+        window.state('zoomed')
+    if fullscreen:
+        window.attributes("-fullscreen", True)
+    
+    # Save window state before closing
+    window.protocol("WM_DELETE_WINDOW", lambda: close_window(window, width, height, x, y))
+    
+    return window
 
+def close_window(window, width, height, x, y):
+    if window.attributes("-fullscreen") == 0:
+            x, y = get_window_position(window)
+    save_window_state(width, height, window.attributes("-fullscreen"), x, y, window.state() == 'zoomed')
+    window.destroy()
 
+def get_window_position(window):
+    geometry_string = window.geometry()
+    x, y = map(int, geometry_string.split('+')[1:])
+    return x, y
+
+def window_event(window):
+    if window.state() != 'zoomed':
+        return window.winfo_width(), window.winfo_height()
+    else:
+        return 0, 0
+
+def main():
+    saved_state = load_window_state()
+    width = 0
+    height = 0
+    x = 0
+    y = 0
+    if saved_state:
+        width, height, fullscreen, x, y, maximized = saved_state["width"], saved_state["height"], saved_state["fullscreen"], saved_state["x"], saved_state["y"], saved_state["maximized"]
+    else:
+        width, height, fullscreen, x, y, maximized = 797, 448, False, 0, 0, False
+    
+    window = create_window(width, height, fullscreen, x, y, maximized)
+
+    # Fullscreen
+    def toggle_fullscreen(event=None):
+        state = not window.attributes("-fullscreen")
+        window.attributes("-fullscreen", state)
+        return "break"
+
+    def end_fullscreen(event=None):
+        window.attributes("-fullscreen", False)
+        return "break"
+
+    # Bind F11 key to toggle fullscreen
+    window.bind("<F11>", toggle_fullscreen)
+    # Bind Escape key to end fullscreen
+    window.bind("<Escape>", end_fullscreen)
+
+    # Canvas body
     canvas = Canvas(
         window,
         bg = "#FFFFFF",
@@ -34,58 +102,140 @@ def main():
         highlightthickness = 0,
         relief = "ridge"
     )
+    canvas.pack(fill="both", expand=True)
 
-    canvas.place(x = 0, y = 0)
-    image_image_1 = PhotoImage(
-        file=relative_to_assets("image_1.png"))
-    image_1 = canvas.create_image(
-        398.0,
-        224.0,
-        image=image_image_1
-    )
+    # Add custom attributes to the canvas object
+    canvas.image_1 = None
+    canvas.image_2 = None
 
-    image_image_2 = PhotoImage(
-        file=relative_to_assets("image_2.png"))
-    image_2 = canvas.create_image(
-        476.0,
-        222.0,
-        image=image_image_2
-    )
+    # Resize background image
+    def resize_background(event=None):
+        # Get the size of the canvas
+        canvas_width = canvas.winfo_width()
+        canvas_height = canvas.winfo_height()
 
-    canvas.create_text(
+        # Resize the image to fit the canvas size
+        resized_image_1 = image_image_1.resize((canvas_width, canvas_height))
+
+        # Convert the resized image to a Tkinter-compatible format
+        photo_image_1 = ImageTk.PhotoImage(resized_image_1)
+
+        # Update the canvas with the resized image
+        canvas.itemconfig(image_1, image=photo_image_1)
+        canvas.image_1 = photo_image_1  # Keep a reference to prevent garbage collection
+
+    # Resize elements in window
+    def resize_canvas(event=None):
+
+        # Window
+        temp_width, temp_height = window_event(window)
+        if temp_width > 0 and temp_height > 0:
+            width = temp_width
+            height = temp_height
+        if window.attributes("-fullscreen") == 0:
+            x, y = get_window_position(window)
+
+        # Get the size of the canvas
+        canvas_width = canvas.winfo_width()
+        canvas_height = canvas.winfo_height()
+
+        # Button 1
+        button_1_width = (int)(canvas_width * 0.157)
+        button_1_height = (int)(canvas_height * 0.112)
+        resized_button_image_1 = Image.open(relative_to_assets("button_1.png")).resize((button_1_width, button_1_height))
+        button_image_1 = ImageTk.PhotoImage(resized_button_image_1)
+        button_1.config(image=button_image_1)
+        button_1.image = button_image_1
+
+        # Resize the background image
+        resize_background()
+
+        # Image 2
+        image_2_width = (int)(canvas_width * 0.729)
+        image_2_height = (int)(canvas_height * 0.944)
+        resized_image_2 = image_image_2.resize((image_2_width, image_2_height))
+        photo_image_2 = ImageTk.PhotoImage(resized_image_2)
+        canvas.itemconfig(image_2, image=photo_image_2)
+        canvas.image_2 = photo_image_2  # Keep a reference to prevent garbage collection
+        canvas.coords(image_2, canvas_width * 0.597, canvas_height * 0.496)
+
+        # Headers
+        text_x = canvas_width / 15
+        text_y = canvas_height / 15
+        font_size = int(min(text_x, text_y))
+        canvas.itemconfig(text_2, font=("Inter", font_size * -1))
+        canvas.coords(text_2, canvas_width * 0.419, canvas_height * 0.580)
+        canvas.itemconfig(text_4, font=("Inter", font_size * -1))
+        canvas.coords(text_4, canvas_width * 0.341, canvas_height * 0.134)
+
+        # Links
+        text_x = canvas_width / 22.4
+        text_y = canvas_height / 22.4
+        font_size = int(min(text_x, text_y))
+        canvas.itemconfig(text_1, font=("Inter", font_size * -1))
+        canvas.coords(text_1, canvas_width * 0.479, canvas_height * 0.692)
+        canvas.itemconfig(text_3, font=("Inter", font_size * -1))
+        canvas.coords(text_3, canvas_width * 0.480, canvas_height * 0.246)
+
+    # Bind resizing events
+    canvas.bind("<Configure>", resize_canvas)
+
+    # Globals
+    global image_image_1, image_image_2, image_1, image_2
+
+    # Image 1
+    image_image_1 = Image.open(relative_to_assets("image_1.png"))
+    photo_image_1 = ImageTk.PhotoImage(image_image_1)
+    image_1 = canvas.create_image(0, 0, anchor="nw", image=photo_image_1)
+
+    # Image 2
+    image_image_2 = Image.open(relative_to_assets("image_2.png"))
+    photo_image_2 = ImageTk.PhotoImage(image_image_2)
+    image_2 = canvas.create_image(0, 0, anchor="center", image=photo_image_2)
+    #image_2 = canvas.create_image(
+    #    476.0,
+    #    222.0,
+    #    image=image_image_2
+    #)
+
+    # Offline link
+    text_1 = canvas.create_text(
         382.0,
         310.0,
         anchor="nw",
         text="<FILE HERE>",
         fill="#0070E0",
-        font=("Inter", 30 * -1)
+        font=("Inter", 20 * -1)
     )
 
-    canvas.create_text(
+    # Header info
+    text_2 = canvas.create_text(
         281.0,
         260.0,
         anchor="nw",
-        text="Offline? Navigate to:",
+        text="Offline? Navigate here.",
         fill="#FFFFFF",
-        font=("Inter", 40 * -1)
+        font=("Inter", 30 * -1)
     )
 
-    canvas.create_text(
+    # Online link
+    text_3 = canvas.create_text(
         321.0,
         110.0,
         anchor="nw",
         text="<INSERT LINK HERE>",
         fill="#0070E0",
-        font=("Inter", 30 * -1)
+        font=("Inter", 20 * -1)
     )
 
-    canvas.create_text(
+    # Header info
+    text_4 = canvas.create_text(
         256.0,
         60.0,
         anchor="nw",
-        text="Click the following link:",
+        text="Online help? Open the webpage!",
         fill="#FFFFFF",
-        font=("Inter", 40 * -1)
+        font=("Inter", 30 * -1)
     )
 
     # Home button
@@ -98,22 +248,22 @@ def main():
         command=lambda: press_home_button(),
         relief="flat"
     )
-    button_1.place(
-        x=31.0,
-        y=199.0,
-        width=125.0,
-        height=50.0
-    )
+    button_1.place(relx=0.124, rely=0.5, anchor="center")
+    #button_1.place(
+    #    x=31.0,
+    #    y=199.0,
+    #    width=125.0,
+    #    height=50.0
+    #)
 
     # Home button action
     def press_home_button():
         print("Debug: Home button clicked")
 
         # Open the window
-        window.destroy()
+        close_window(window, width, height, x, y)
         gui_home.main()
 
-    window.resizable(False, False)
     window.mainloop()
 
 if __name__ == "__main__":
