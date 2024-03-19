@@ -1,19 +1,24 @@
 import serial
 
 # Define the serial port and baudrate globally
-OUTPORT = 'COM3'  # Change this to your serial port
-BAUDRATE = 9600  # Change this to match your device's baudrate
+global OUTPORT, BAUDRATE
+OUTPORT = 'COM3'  # Default Serial Port
+BAUDRATE = 9600  # Default Baud Rate (will not be changed)
 
 # Flag to indicate if the connection attempt is in progress
 connection_in_progress = False
 
+# Get the port and baudrate
+def get_serial_info():
+    return OUTPORT, BAUDRATE
+
 # Open the serial port for receiving packets
-def start_bluetooth():
+def start_bluetooth(port, baud):
     global connection_in_progress
     try:
-        print(f"Connecting to Serial Port {OUTPORT} using baudrate {BAUDRATE}.")
+        print(f"Connecting to Serial Port {port} using baudrate {baud}.")
         connection_in_progress = True
-        ser_out = serial.Serial(OUTPORT, BAUDRATE)
+        ser_out = serial.Serial(port, baud)
         connection_in_progress = False
         return ser_out
     except serial.SerialException as e:
@@ -55,11 +60,10 @@ def stop_bluetooth(ser_out):
 
 if __name__ == "__main__":
     # Start the Bluetooth connection on a separate thread
-    connection_thread = threading.Thread(target=start_bluetooth)
-    connection_thread.start()
+    ser_out = start_bluetooth(OUTPORT, BAUDRATE)
     
     # Wait for the user input to stop Bluetooth
     input("Press Enter to stop Bluetooth...")
     
     # Close the Bluetooth connection
-    stop_bluetooth(connection_thread)
+    stop_bluetooth(ser_out)

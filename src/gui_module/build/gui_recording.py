@@ -4,120 +4,290 @@
 
 
 from pathlib import Path
+#from gui_module.build import gui_recording
+import json
+import threading
+from PIL import Image, ImageTk
+from data_processing.serial_bluetooth_communication import stop_bluetooth
+from data_processing.record_imu import send_end_signal
+import time
 
-# from tkinter import *
 # Explicit imports to satisfy Flake8
 from tkinter import Tk, Canvas, Entry, Text, Button, PhotoImage
-
 
 OUTPUT_PATH = Path(__file__).parent
 ASSETS_PATH = OUTPUT_PATH / Path(r".\assets\frame8")
 
-
 def relative_to_assets(path: str) -> Path:
     return ASSETS_PATH / Path(path)
 
+def save_window_state(width, height, fullscreen, x, y, state):
+    with open(r"gui_module\build\assets\window_state.json", "w") as f:
+        json.dump({"width": width, "height": height, "fullscreen": fullscreen, "x": x, "y": y, "maximized": state}, f)
 
-window = Tk()
+def load_window_state():
+    try:
+        with open(r"gui_module\build\assets\window_state.json", "r") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return None
+    
+def create_window(width, height, fullscreen, x, y, maximized):
+    window = Tk()
+    window.geometry(f"{width}x{height}")
+    window.configure(bg="#FFFFFF")
+    window.geometry("+{}+{}".format(x, y))
 
-window.geometry("797x448")
-window.configure(bg = "#FFFFFF")
+    # Maximized or fullscreen?
+    if maximized:
+        window.state('zoomed')
+    if fullscreen:
+        window.attributes("-fullscreen", True)
+    
+    # Save window state before closing
+    window.protocol("WM_DELETE_WINDOW", lambda: close_window(window, width, height, x, y, True))
+    
+    return window
 
+def close_window(window, width, height, x, y, closeBluetooth):
+    if window.attributes("-fullscreen") == 0:
+            x, y = get_window_position(window)
+    save_window_state(width, height, window.attributes("-fullscreen"), x, y, window.state() == 'zoomed')
+    if closeBluetooth:
+        global terminate_bluetooth
+        terminate_bluetooth = True
+        send_end_signal()
+        stop_bluetooth()
+    window.destroy()
 
-canvas = Canvas(
-    window,
-    bg = "#FFFFFF",
-    height = 448,
-    width = 797,
-    bd = 0,
-    highlightthickness = 0,
-    relief = "ridge"
-)
+def get_window_position(window):
+    geometry_string = window.geometry()
+    x, y = map(int, geometry_string.split('+')[1:])
+    return x, y
 
-canvas.place(x = 0, y = 0)
-image_image_1 = PhotoImage(
-    file=relative_to_assets("image_1.png"))
-image_1 = canvas.create_image(
-    398.0,
-    224.0,
-    image=image_image_1
-)
+def window_event(window):
+    if window.state() != 'zoomed':
+        return window.winfo_width(), window.winfo_height()
+    else:
+        return 0, 0
 
-canvas.create_rectangle(
-    16.0,
-    192.0,
-    386.0,
-    432.0,
-    fill="#45AC2B",
-    outline="")
+def notify_end_bluetooth():
+    global terminate_bluetooth, imu_received
+    imu_received = True
+    terminate_bluetooth = True
+    stop_bluetooth()
+    if video_received == True:
+        finish_recording()
 
-canvas.create_rectangle(
-    411.0,
-    192.0,
-    781.0,
-    432.0,
-    fill="#45AC2C",
-    outline="")
+def notify_end_videos():
+    global video_received
+    video_received = True
+    if imu_received == True:
+        finish_recording()
 
-canvas.create_text(
-    511.0,
-    273.0,
-    anchor="nw",
-    text="VIDEO 2\n<RECORDING>",
-    fill="#FFFFFF",
-    font=("Inter", 24 * -1)
-)
+def finish_recording():
+    print("Collected Data!")
 
-canvas.create_rectangle(
-    16.2652587890625,
-    48.0,
-    386.2652587890625,
-    176.0,
-    fill="#FF0000",
-    outline="")
+def main(ser_out):
+    saved_state = load_window_state()
+    width = 0
+    height = 0
+    x = 0
+    y = 0
+    if saved_state:
+        width, height, fullscreen, x, y, maximized = saved_state["width"], saved_state["height"], saved_state["fullscreen"], saved_state["x"], saved_state["y"], saved_state["maximized"]
+    else:
+        width, height, fullscreen, x, y, maximized = 797, 448, False, 0, 0, False
+    
+    window = create_window(width, height, fullscreen, x, y, maximized)
 
-canvas.create_rectangle(
-    411.0,
-    48.0,
-    781.0,
-    176.0,
-    fill="#FFFFFF",
-    outline="")
+    # Recording status
+    global imu_received, video_received
+    imu_received = False
+    video_received = False
+            
+    # Fullscreen
+    def toggle_fullscreen(event=None):
+        state = not window.attributes("-fullscreen")
+        window.attributes("-fullscreen", state)
+        return "break"
 
-canvas.create_text(
-    116.0,
-    79.0,
-    anchor="nw",
-    text="STATUS\n<RECORDING>",
-    fill="#FFFFFF",
-    font=("Inter", 24 * -1)
-)
+    def end_fullscreen(event=None):
+        window.attributes("-fullscreen", False)
+        return "break"
 
-canvas.create_text(
-    511.0,
-    79.0,
-    anchor="nw",
-    text="MCU\n<RECORDING>",
-    fill="#000000",
-    font=("Inter", 24 * -1)
-)
+    # Bind F11 key to toggle fullscreen
+    window.bind("<F11>", toggle_fullscreen)
+    # Bind Escape key to end fullscreen
+    window.bind("<Escape>", end_fullscreen)
 
-canvas.create_text(
-    110.0,
-    273.0,
-    anchor="nw",
-    text="VIDEO 1\n<RECORDING>",
-    fill="#FFFFFF",
-    font=("Inter", 24 * -1)
-)
+    # Body
+    canvas = Canvas(
+        window,
+        bg = "#FFFFFF",
+        height = 448,
+        width = 797,
+        bd = 0,
+        highlightthickness = 0,
+        relief = "ridge"
+    )
+    canvas.pack(fill="both", expand=True)
 
-canvas.create_text(
-    16.0,
-    12.0,
-    anchor="nw",
-    text="AutoCaddie",
-    fill="#1E1E1E",
-    font=("Inter SemiBold", 24 * -1)
-)
-window.resizable(False, False)
-window.mainloop()
+    # Resize background image
+    def resize_background(event=None):
+        # Get the size of the canvas
+        canvas_width = canvas.winfo_width()
+        canvas_height = canvas.winfo_height()
+
+        # Resize the image to fit the canvas size
+        resized_image_1 = image_image_1.resize((canvas_width, canvas_height))
+
+        # Convert the resized image to a Tkinter-compatible format
+        photo_image_1 = ImageTk.PhotoImage(resized_image_1)
+
+        # Update the canvas with the resized image
+        canvas.itemconfig(image_1, image=photo_image_1)
+        canvas.image_1 = photo_image_1  # Keep a reference to prevent garbage collection
+
+    # Resize elements in window
+    def resize_canvas(event=None):
+
+        # Window
+        temp_width, temp_height = window_event(window)
+        if temp_width > 0 and temp_height > 0:
+            width = temp_width
+            height = temp_height
+        if window.attributes("-fullscreen") == 0:
+            x, y = get_window_position(window)
+
+        # Get the size of the canvas
+        canvas_width = canvas.winfo_width()
+        canvas_height = canvas.winfo_height()
+
+        # Resize the background image
+        resize_background()
+
+        # Rectangles
+        new_cords = [canvas_width * 0.020, canvas_height * 0.429, canvas_width * 0.484, canvas_height * 0.964]
+        canvas.coords(rectangle_1, *new_cords)
+        new_cords = [canvas_width * 0.516, canvas_height * 0.429, canvas_width * 0.98, canvas_height * 0.964]
+        canvas.coords(rectangle_2, *new_cords)
+        new_cords = [canvas_width * 0.020, canvas_height * 0.107, canvas_width * 0.484, canvas_height * 0.393]
+        canvas.coords(rectangle_3, *new_cords)
+        new_cords = [canvas_width * 0.516, canvas_height * 0.107, canvas_width * 0.98, canvas_height * 0.393]
+        canvas.coords(rectangle_4, *new_cords)
+
+        # Text
+        text_x = canvas_width / 18.667
+        text_y = canvas_height / 18.667
+        font_size = int(min(text_x, text_y))
+        canvas.itemconfig(text_1, font=("Inter", font_size * -1))
+        canvas.coords(text_1, canvas_width * 0.683, canvas_height * 0.630)
+        canvas.itemconfig(text_2, font=("Inter", font_size * -1))
+        canvas.coords(text_2, canvas_width * 0.179, canvas_height * 0.183)
+        canvas.itemconfig(text_3, font=("Inter", font_size * -1))
+        canvas.coords(text_3, canvas_width * 0.683, canvas_height * 0.183)
+        canvas.itemconfig(text_4, font=("Inter", font_size * -1))
+        canvas.coords(text_4, canvas_width * 0.197, canvas_height * 0.630)
+        canvas.itemconfig(text_5, font=("Inter", font_size * -1))
+        canvas.coords(text_5, canvas_width * 0.02, canvas_height * 0.027)
+
+    # Bind resizing events
+    canvas.bind("<Configure>", resize_canvas)
+
+    # Image 1
+    image_image_1 = Image.open(relative_to_assets("image_1.png"))
+    photo_image_1 = ImageTk.PhotoImage(image_image_1)
+    image_1 = canvas.create_image(0, 0, anchor="nw", image=photo_image_1)
+
+    # Rectangle 1
+    rectangle_1 = canvas.create_rectangle(
+        16.0,
+        192.0,
+        386.0,
+        432.0,
+        fill="#1E1E1E",
+        outline="")
+
+    # Rectangle 2
+    rectangle_2 = canvas.create_rectangle(
+        411.0,
+        192.0,
+        781.0,
+        432.0,
+        fill="#1E1E1E",
+        outline="")
+
+    # Text 1
+    text_1 = canvas.create_text(
+        544.0,
+        282.0,
+        anchor="nw",
+        text="VIDEO 2\nRecording...",
+        fill="#FFFFFF",
+        font=("Inter", 24 * -1)
+    )
+
+    # Rectangle 3
+    rectangle_3 = canvas.create_rectangle(
+        16.26530647277832,
+        48.0,
+        386.2653064727783,
+        176.0,
+        fill="#FF0000",
+        outline="")
+
+    # Rectangle 4
+    rectangle_4 = canvas.create_rectangle(
+        411.0,
+        48.0,
+        781.0,
+        176.0,
+        fill="#FFFFFF",
+        outline="")
+
+    # Text 2
+    text_2 = canvas.create_text(
+        143.0,
+        82.0,
+        anchor="nw",
+        text="STATUS\nRecording...",
+        fill="#000000",
+        font=("Inter", 24 * -1)
+    )
+
+    # Text 3
+    text_3 = canvas.create_text(
+        544.0,
+        82.0,
+        anchor="nw",
+        text="MCU\nRecording...",
+        fill="#000000",
+        font=("Inter", 24 * -1)
+    )
+
+    # Text 4
+    text_4 = canvas.create_text(
+        143.0,
+        282.0,
+        anchor="nw",
+        text="VIDEO 1\nRecording...",
+        fill="#FFFFFF",
+        font=("Inter", 24 * -1)
+    )
+
+    # Text 5
+    text_5 = canvas.create_text(
+        16.0,
+        12.0,
+        anchor="nw",
+        text="AutoCaddie",
+        fill="#1E1E1E",
+        font=("Inter SemiBold", 24 * -1)
+    )
+
+    # Iterate until data is received
+    window.mainloop()
+
+if __name__ == "__main__":
+    main()
