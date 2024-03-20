@@ -13,7 +13,6 @@ from data_processing.record_imu import receive_imu_data
 from data_processing.find_serial_port import find_com
 from algorithms.cv.find_valid_camera_indices import find_camera_indices
 from algorithms.cv.convert_video_to_display import open_cameras, close_cameras, get_frame_from_camera
-import cv2
 
 # from tkinter import *
 # Explicit imports to satisfy Flake8
@@ -57,14 +56,14 @@ def close_window(window, width, height, x, y, closeBluetooth):
     if window.attributes("-fullscreen") == 0:
             x, y = get_window_position(window)
     save_window_state(width, height, window.attributes("-fullscreen"), x, y, window.state() == 'zoomed')
-    global cameras
-    if cameras is not None:
-        close_cameras(cameras)
     
     if closeBluetooth:
-        global terminate_bluetooth
+        global terminate_bluetooth, ser_out
         terminate_bluetooth = True
         stop_bluetooth(ser_out)
+        global cameras
+        if cameras is not None:
+            close_cameras(cameras)
     window.destroy()
 
 def get_window_position(window):
@@ -92,10 +91,12 @@ def main():
     window = create_window(width, height, fullscreen, x, y, maximized)
 
     # Calibration states
-    global connected_bluetooth, connected_cameras, cameras
+    global connected_bluetooth, connected_cameras, cameras, ser_out, terminate_bluetooth
     connected_bluetooth = False
     connected_cameras = 0
     cameras = None
+    ser_out = None
+    terminate_bluetooth = False
             
     # Fullscreen
     def toggle_fullscreen(event=None):
@@ -169,6 +170,17 @@ def main():
         new_cords = [canvas_width * 0.516, canvas_height * 0.107, canvas_width * 0.98, canvas_height * 0.393]
         canvas.coords(rectangle_4, *new_cords)
 
+        # Text
+        text_x = canvas_width / 18.667
+        text_y = canvas_height / 18.667
+        font_size = int(min(text_x, text_y))
+        canvas.itemconfig(text_2, font=("Inter", font_size * -1))
+        canvas.coords(text_2, canvas_width * 0.179, canvas_height * 0.183)
+        canvas.itemconfig(text_3, font=("Inter", font_size * -1))
+        canvas.coords(text_3, canvas_width * 0.683, canvas_height * 0.183)
+        canvas.itemconfig(text_5, font=("Inter", font_size * -1))
+        canvas.coords(text_5, canvas_width * 0.02, canvas_height * 0.027)
+
         # Images
         global camera_width, camera_height
         camera_width = (int)(canvas_width * 0.464)
@@ -177,30 +189,19 @@ def main():
         if connected_cameras < 2 :
             resized_rectangle = dark_black_image.resize((camera_width, camera_height))
             photo_image_dark_black = ImageTk.PhotoImage(resized_rectangle)
-            # Rectangle 2
+            # Rectangles
             canvas.itemconfig(rectangle_2, image=photo_image_dark_black)
             canvas.rectangle_2 = photo_image_dark_black
             canvas.coords(rectangle_2, canvas_width * 0.517, canvas_height * 0.429)
-            # Rectangle 1
-            if connected_cameras == 0:          # THIS IS MODIFIED FOR TESTING!!!
-                canvas.itemconfig(rectangle_1, image=photo_image_dark_black)
-                canvas.rectangle_1 = photo_image_dark_black
-                canvas.coords(rectangle_1, canvas_width * 0.020, canvas_height * 0.429)
+            canvas.itemconfig(rectangle_1, image=photo_image_dark_black)
+            canvas.rectangle_1 = photo_image_dark_black
+            canvas.coords(rectangle_1, canvas_width * 0.020, canvas_height * 0.429)
 
-        # Text
-        text_x = canvas_width / 18.667
-        text_y = canvas_height / 18.667
-        font_size = int(min(text_x, text_y))
-        canvas.itemconfig(text_1, font=("Inter", font_size * -1))
-        canvas.coords(text_1, canvas_width * 0.683, canvas_height * 0.630)
-        canvas.itemconfig(text_2, font=("Inter", font_size * -1))
-        canvas.coords(text_2, canvas_width * 0.179, canvas_height * 0.183)
-        canvas.itemconfig(text_3, font=("Inter", font_size * -1))
-        canvas.coords(text_3, canvas_width * 0.683, canvas_height * 0.183)
-        canvas.itemconfig(text_4, font=("Inter", font_size * -1))
-        canvas.coords(text_4, canvas_width * 0.197, canvas_height * 0.630)
-        canvas.itemconfig(text_5, font=("Inter", font_size * -1))
-        canvas.coords(text_5, canvas_width * 0.02, canvas_height * 0.027)
+            # Texts
+            canvas.itemconfig(text_1, font=("Inter", font_size * -1))
+            canvas.coords(text_1, canvas_width * 0.683, canvas_height * 0.630)
+            canvas.itemconfig(text_4, font=("Inter", font_size * -1))
+            canvas.coords(text_4, canvas_width * 0.197, canvas_height * 0.630)
 
     # Bind resizing events
     canvas.bind("<Configure>", resize_canvas)
@@ -306,7 +307,6 @@ def main():
 
         # Ensure bluetooth initialized correctly
         global ser_out, terminate_bluetooth, connected_bluetooth
-        ser_out = None
         terminate_bluetooth = False
 
         # Find the correct out port
@@ -315,24 +315,32 @@ def main():
             print("Finding Bluetooth Com")
             com = find_com()
 
+        # Bluetooth is found, show it visually
+        canvas.itemconfig(text_3, text="MCU\nReady!")
+        canvas.itemconfig(text_3, fill="#FFFFFF")
+        canvas.itemconfig(rectangle_4, fill="#45AC2C")
+
         # Establish a bluetooth connection
         baud = 9600
         ser_out = start_bluetooth(com, baud)
         while ser_out is None and terminate_bluetooth is False:
             print("Starting Bluetooth")
             ser_out = start_bluetooth(com, baud)
+        connected_bluetooth = True
+        print(f"Connected via {com}")
 
         # Continuously poll for start packet
-        while connected_bluetooth is False and terminate_bluetooth is False:
+        # Not needed...
+        #while connected_bluetooth is False and terminate_bluetooth is False:
 
             # Poll infinitely
-            line = receive_packet(ser_out)
-            if line == None:
-                continue
+        #    line = receive_packet(ser_out)
+        #    if line == None:
+        #        continue
 
-            # Start signal?
-            if line == "READY":
-                connected_bluetooth = True
+        #    # Start signal?
+        #    if line == "READY":
+        #        connected_bluetooth = True
 
         # Continuously poll for "Start Recording" signal
         while terminate_bluetooth is False:
@@ -343,10 +351,10 @@ def main():
                 continue
 
             # Button pressed on hardware?
-            if line == "START":
+            if line == "READY":
 
                 # Good to go?
-                if connected_cameras == 2:
+                if connected_cameras > 1:
                     terminate_bluetooth = True
                     next_window()
 
@@ -361,7 +369,7 @@ def main():
         # Get valid camera indices
         global terminate_bluetooth, connected_cameras
         camera_indices = find_camera_indices()
-        while len(camera_indices) < 1:                  # THIS IS MODIFIED FOR TESTING!!!
+        while len(camera_indices) < 2:
             print("Will retry looking for cameras")
             camera_indices = find_camera_indices()
             if terminate_bluetooth == True:
@@ -371,21 +379,19 @@ def main():
         connected_cameras = len(camera_indices)
         print(f"Debug: Found {connected_cameras} cameras")
         if not terminate_bluetooth:
-            window.after(1, update_camera_feeds)  # 1 milisecond
+            window.after(1, start_updating_cameras)  # 1 milisecond
 
         # Select the first 2 camera feeds in the list
         #video_stream_1 = capture_camera(camera_indices[0])
         #video_stream_2 = capture_camera(camera_indices[1])
 
         # Replace the rectangles with images
+    def start_updating_cameras():
+        canvas.delete(text_1)
+        canvas.delete(text_4)
+        update_camera_feeds()
     
     def update_camera_feeds():
-        # This code is in the main thread...
-        #current_thread = threading.current_thread()
-        #if current_thread.name == "MainThread":
-        #    print("This code is running in the main thread.")
-        #else:
-        #    print(f"This code is running in a separate thread named '{current_thread.name}'.")
         global terminate_bluetooth, cameras
         global camera_width, camera_height
         captured_frame = get_frame_from_camera(cameras[0], camera_width, camera_height)
@@ -397,11 +403,8 @@ def main():
             canvas.itemconfig(rectangle_2, image=captured_frame)
             canvas.rectangle_2 = captured_frame  # Prevent garbage collection
             canvas.coords(rectangle_2, canvas_width * 0.517, canvas_height * 0.429)
-
-        #update_video(canvas, cameras[0], rectangle_1, canvas.rectangle_1, camera_width, camera_height, canvas_width * 0.020, canvas_height * 0.429)
-        #update_video(canvas, cameras[1], rectangle_2, canvas.rectangle_2, camera_width, camera_height, canvas_width * 0.517, canvas_height * 0.429)
         if not terminate_bluetooth:
-            window.after(100, update_camera_feeds)  # 1 milisecond
+            window.after(17, update_camera_feeds)  # 60 FPS
 
     # Move to the recording frame
     def next_window():
