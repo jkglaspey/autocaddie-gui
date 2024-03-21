@@ -10,7 +10,7 @@ import threading
 from PIL import Image, ImageTk
 from data_processing.serial_bluetooth_communication import stop_bluetooth
 from data_processing.record_imu import send_end_signal
-import time
+from algorithms.cv.convert_video_to_display import close_camera, close_cameras, get_frame_from_camera
 
 # Explicit imports to satisfy Flake8
 from tkinter import Tk, Canvas, Entry, Text, Button, PhotoImage
@@ -53,11 +53,11 @@ def close_window(window, width, height, x, y, closeBluetooth):
     if window.attributes("-fullscreen") == 0:
             x, y = get_window_position(window)
     save_window_state(width, height, window.attributes("-fullscreen"), x, y, window.state() == 'zoomed')
-    if closeBluetooth:
-        global terminate_bluetooth
+    if closeBluetooth is True:
+        global terminate_bluetooth, ser_out
         terminate_bluetooth = True
         send_end_signal()
-        stop_bluetooth()
+        stop_bluetooth(ser_out)
     window.destroy()
 
 def get_window_position(window):
@@ -72,23 +72,36 @@ def window_event(window):
         return 0, 0
 
 def notify_end_bluetooth():
-    global terminate_bluetooth, imu_received
+    global terminate_bluetooth, imu_received, ser_out, text_states
     imu_received = True
     terminate_bluetooth = True
-    stop_bluetooth()
+    stop_bluetooth(ser_out)
+    # Modify text states
+    text_states["text_mcu"] = False
+    text_states["text_status"] = False
     if video_received == True:
         finish_recording()
 
+def notify_start_videos():
+    global save_image
+    save_image = True
+
 def notify_end_videos():
-    global video_received
+    global video_received, save_image
     video_received = True
+    save_image = False
     if imu_received == True:
         finish_recording()
 
 def finish_recording():
-    print("Collected Data!")
+    print("\n\nCollected Data!\n\nThis is where the next transition would be.")
+    global cameras
+    close_cameras(cameras)
 
-def main(ser_out):
+def main(ser_out_ref, camera_1, camera_2):
+    global ser_out
+    ser_out = ser_out_ref
+
     saved_state = load_window_state()
     width = 0
     height = 0
@@ -105,6 +118,16 @@ def main(ser_out):
     global imu_received, video_received
     imu_received = False
     video_received = False
+
+    # Saving images?
+    global save_image
+    save_image = False
+
+    # Reference to cameras
+    global cameras
+    cameras = []
+    cameras.append(camera_1)
+    cameras.append(camera_2)
             
     # Fullscreen
     def toggle_fullscreen(event=None):
@@ -133,11 +156,19 @@ def main(ser_out):
     )
     canvas.pack(fill="both", expand=True)
 
+    # Initialize dimensions
+    global camera_width, camera_height, canvas_width, canvas_height
+    canvas_width = canvas.winfo_width()
+    canvas_height = canvas.winfo_height()
+    camera_width = (int)(canvas_width * 0.464)
+    camera_height = (int)(canvas_height * 0.535)
+    if camera_width == 0:
+        camera_width = 1
+    if camera_height == 0:
+        camera_height = 1
+
     # Resize background image
     def resize_background(event=None):
-        # Get the size of the canvas
-        canvas_width = canvas.winfo_width()
-        canvas_height = canvas.winfo_height()
 
         # Resize the image to fit the canvas size
         resized_image_1 = image_image_1.resize((canvas_width, canvas_height))
@@ -161,6 +192,7 @@ def main(ser_out):
             x, y = get_window_position(window)
 
         # Get the size of the canvas
+        global canvas_width, canvas_height
         canvas_width = canvas.winfo_width()
         canvas_height = canvas.winfo_height()
 
@@ -168,10 +200,6 @@ def main(ser_out):
         resize_background()
 
         # Rectangles
-        new_cords = [canvas_width * 0.020, canvas_height * 0.429, canvas_width * 0.484, canvas_height * 0.964]
-        canvas.coords(rectangle_1, *new_cords)
-        new_cords = [canvas_width * 0.516, canvas_height * 0.429, canvas_width * 0.98, canvas_height * 0.964]
-        canvas.coords(rectangle_2, *new_cords)
         new_cords = [canvas_width * 0.020, canvas_height * 0.107, canvas_width * 0.484, canvas_height * 0.393]
         canvas.coords(rectangle_3, *new_cords)
         new_cords = [canvas_width * 0.516, canvas_height * 0.107, canvas_width * 0.98, canvas_height * 0.393]
@@ -181,52 +209,96 @@ def main(ser_out):
         text_x = canvas_width / 18.667
         text_y = canvas_height / 18.667
         font_size = int(min(text_x, text_y))
-        canvas.itemconfig(text_1, font=("Inter", font_size * -1))
-        canvas.coords(text_1, canvas_width * 0.683, canvas_height * 0.630)
         canvas.itemconfig(text_2, font=("Inter", font_size * -1))
         canvas.coords(text_2, canvas_width * 0.179, canvas_height * 0.183)
         canvas.itemconfig(text_3, font=("Inter", font_size * -1))
         canvas.coords(text_3, canvas_width * 0.683, canvas_height * 0.183)
-        canvas.itemconfig(text_4, font=("Inter", font_size * -1))
-        canvas.coords(text_4, canvas_width * 0.197, canvas_height * 0.630)
         canvas.itemconfig(text_5, font=("Inter", font_size * -1))
         canvas.coords(text_5, canvas_width * 0.02, canvas_height * 0.027)
 
+        # Images
+        global camera_width, camera_height
+        camera_width = (int)(canvas_width * 0.464)
+        camera_height = (int)(canvas_height * 0.535)
+
+        # Center Text 2 and Text 3
+        rect_3_x1, rect_3_y1, rect_3_x2, rect_3_y2 = canvas.coords(rectangle_3)
+        rect_3_center_x = (rect_3_x1 + rect_3_x2) / 2
+        rect_3_center_y = (rect_3_y1 + rect_3_y2) / 2
+        text_2_bbox = canvas.bbox(text_2)
+        text_2_width = text_2_bbox[2] - text_2_bbox[0]
+        text_2_height = text_2_bbox[3] - text_2_bbox[1]
+        text_2_x = rect_3_center_x - text_2_width / 2
+        text_2_y = rect_3_center_y - text_2_height / 2
+        canvas.coords(text_2, text_2_x, text_2_y)
+
+        rect_4_x1, rect_4_y1, rect_4_x2, rect_4_y2 = canvas.coords(rectangle_4)
+        rect_4_center_x = (rect_4_x1 + rect_4_x2) / 2
+        rect_4_center_y = (rect_4_y1 + rect_4_y2) / 2
+        text_3_bbox = canvas.bbox(text_3)
+        text_3_width = text_3_bbox[2] - text_3_bbox[0]
+        text_3_height = text_3_bbox[3] - text_3_bbox[1]
+        text_3_x = rect_4_center_x - text_3_width / 2
+        text_3_y = rect_4_center_y - text_3_height / 2
+        canvas.coords(text_3, text_3_x, text_3_y)
+
     # Bind resizing events
     canvas.bind("<Configure>", resize_canvas)
+
+    # Switch dot states to display "waiting" to the user
+    global text_states
+    text_states = {
+        "text_mcu": True,
+        "text_status": True
+    }
+    def update_waiting_text(text_item, initial_text, delay, id):
+        dots = 0
+
+        def update_text():
+            if text_states[id]:
+                nonlocal dots
+                new_text = initial_text[:-3] + "." * (dots % 4)
+                canvas.itemconfig(text_item, text=new_text)
+                dots += 1
+                if not imu_received or not video_received:
+                    canvas.after(delay, update_text)
+            # Only 1 time text will be animated. Use this to update boxes
+            elif id == "text_mcu":
+                canvas.itemconfig(text_3, text="MCU\nReady!")
+                canvas.itemconfig(text_3, fill="#FFFFFF")
+                canvas.itemconfig(rectangle_4, fill="#45AC2C")
+                canvas.itemconfig(text_2, text="STATUS\nCompleted!")
+                canvas.itemconfig(text_2, fill="#FFFFFF")
+                canvas.itemconfig(rectangle_3, fill="#45AC2C")
+
+        update_text()
 
     # Image 1
     image_image_1 = Image.open(relative_to_assets("image_1.png"))
     photo_image_1 = ImageTk.PhotoImage(image_image_1)
     image_1 = canvas.create_image(0, 0, anchor="nw", image=photo_image_1)
 
-    # Rectangle 1
-    rectangle_1 = canvas.create_rectangle(
-        16.0,
-        192.0,
-        386.0,
-        432.0,
-        fill="#1E1E1E",
-        outline="")
+    # Rectangle 1 (REPLACE WITH IMAGE)
+    #rectangle_1 = canvas.create_rectangle(
+    #    16.0,
+    #    192.0,
+    #    386.0,
+    #    432.0,
+    #    fill="#1E1E1E",
+    #    outline="")
+    dark_black_image = Image.new("RGB", (370, 240), "#1E1E1E")
+    photo_image_dark_black = ImageTk.PhotoImage(dark_black_image)
+    rectangle_1 = canvas.create_image(16, 192, anchor="nw", image=photo_image_dark_black)
 
-    # Rectangle 2
-    rectangle_2 = canvas.create_rectangle(
-        411.0,
-        192.0,
-        781.0,
-        432.0,
-        fill="#1E1E1E",
-        outline="")
-
-    # Text 1
-    text_1 = canvas.create_text(
-        544.0,
-        282.0,
-        anchor="nw",
-        text="VIDEO 2\nRecording...",
-        fill="#FFFFFF",
-        font=("Inter", 24 * -1)
-    )
+    # Rectangle 2 (REPLACE WITH IMAGE)
+    #rectangle_2 = canvas.create_rectangle(
+    #    411.0,
+    #    192.0,
+    #    781.0,
+    #    432.0,
+    #    fill="#1E1E1E",
+    #    outline="")
+    rectangle_2 = canvas.create_image(411, 192, anchor="nw", image=photo_image_dark_black)
 
     # Rectangle 3
     rectangle_3 = canvas.create_rectangle(
@@ -255,6 +327,7 @@ def main(ser_out):
         fill="#000000",
         font=("Inter", 24 * -1)
     )
+    update_waiting_text(text_2, "STATUS\nRecording...", 1000, "text_status")
 
     # Text 3
     text_3 = canvas.create_text(
@@ -265,16 +338,7 @@ def main(ser_out):
         fill="#000000",
         font=("Inter", 24 * -1)
     )
-
-    # Text 4
-    text_4 = canvas.create_text(
-        143.0,
-        282.0,
-        anchor="nw",
-        text="VIDEO 1\nRecording...",
-        fill="#FFFFFF",
-        font=("Inter", 24 * -1)
-    )
+    update_waiting_text(text_3, "MCU\nRecording...", 1000, "text_mcu")
 
     # Text 5
     text_5 = canvas.create_text(
@@ -285,6 +349,22 @@ def main(ser_out):
         fill="#1E1E1E",
         font=("Inter SemiBold", 24 * -1)
     )
+
+    def update_cameras():
+        global camera_width, camera_height
+        global imu_received, video_received
+        global save_image
+        captured_frame = get_frame_from_camera(camera_1, camera_width, camera_height, save_image)
+        canvas.itemconfig(rectangle_1, image=captured_frame)
+        canvas.rectangle_1 = captured_frame  # Prevent garbage collection
+        canvas.coords(rectangle_1, canvas_width * 0.020, canvas_height * 0.429)
+        captured_frame = get_frame_from_camera(camera_2, camera_width, camera_height, save_image)
+        canvas.itemconfig(rectangle_2, image=captured_frame)
+        canvas.rectangle_2 = captured_frame  # Prevent garbage collection
+        canvas.coords(rectangle_2, canvas_width * 0.517, canvas_height * 0.429)
+        if not video_received:
+            window.after(17, update_cameras)  # 60 FPS
+    update_cameras()
 
     # Iterate until data is received
     window.mainloop()

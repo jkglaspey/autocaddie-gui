@@ -12,7 +12,7 @@ from data_processing.serial_bluetooth_communication import start_bluetooth, rece
 from data_processing.record_imu import receive_imu_data
 from data_processing.find_serial_port import find_com
 from algorithms.cv.find_valid_camera_indices import find_camera_indices
-from algorithms.cv.convert_video_to_display import open_cameras, close_cameras, get_frame_from_camera
+from algorithms.cv.convert_video_to_display import open_cameras, close_cameras, close_camera, get_frame_from_camera
 
 # from tkinter import *
 # Explicit imports to satisfy Flake8
@@ -57,7 +57,7 @@ def close_window(window, width, height, x, y, closeBluetooth):
             x, y = get_window_position(window)
     save_window_state(width, height, window.attributes("-fullscreen"), x, y, window.state() == 'zoomed')
     
-    if closeBluetooth:
+    if closeBluetooth is True:
         global terminate_bluetooth, ser_out
         terminate_bluetooth = True
         stop_bluetooth(ser_out)
@@ -202,9 +202,54 @@ def main():
             canvas.coords(text_1, canvas_width * 0.683, canvas_height * 0.630)
             canvas.itemconfig(text_4, font=("Inter", font_size * -1))
             canvas.coords(text_4, canvas_width * 0.197, canvas_height * 0.630)
+        
+        # Center Text 2 and Text 3
+        rect_3_x1, rect_3_y1, rect_3_x2, rect_3_y2 = canvas.coords(rectangle_3)
+        rect_3_center_x = (rect_3_x1 + rect_3_x2) / 2
+        rect_3_center_y = (rect_3_y1 + rect_3_y2) / 2
+        text_2_bbox = canvas.bbox(text_2)
+        text_2_width = text_2_bbox[2] - text_2_bbox[0]
+        text_2_height = text_2_bbox[3] - text_2_bbox[1]
+        text_2_x = rect_3_center_x - text_2_width / 2
+        text_2_y = rect_3_center_y - text_2_height / 2
+        canvas.coords(text_2, text_2_x, text_2_y)
+
+        rect_4_x1, rect_4_y1, rect_4_x2, rect_4_y2 = canvas.coords(rectangle_4)
+        rect_4_center_x = (rect_4_x1 + rect_4_x2) / 2
+        rect_4_center_y = (rect_4_y1 + rect_4_y2) / 2
+        text_3_bbox = canvas.bbox(text_3)
+        text_3_width = text_3_bbox[2] - text_3_bbox[0]
+        text_3_height = text_3_bbox[3] - text_3_bbox[1]
+        text_3_x = rect_4_center_x - text_3_width / 2
+        text_3_y = rect_4_center_y - text_3_height / 2
+        canvas.coords(text_3, text_3_x, text_3_y)
 
     # Bind resizing events
     canvas.bind("<Configure>", resize_canvas)
+
+    # Switch dot states to display "waiting" to the user
+    global text_states
+    text_states = {
+        "text_2_wait_all": True,
+        "text_2_wait_cam": True,
+        "text_2_wait_mcu": True,
+        "text_1": True,
+        "text_3": True,
+        "text_4": True
+    }
+    def update_waiting_text(text_item, initial_text, delay, id):
+        dots = 0
+
+        def update_text():
+            if text_states[id]:
+                nonlocal dots
+                new_text = initial_text[:-3] + "." * (dots % 4)
+                canvas.itemconfig(text_item, text=new_text)
+                dots += 1
+                if not terminate_bluetooth:
+                    canvas.after(delay, update_text)
+
+        update_text()
 
     # Image 1
     image_image_1 = Image.open(relative_to_assets("image_1.png"))
@@ -240,8 +285,10 @@ def main():
         anchor="nw",
         text="VIDEO 2\nWaiting...",
         fill="#FFFFFF",
-        font=("Inter", 24 * -1)
+        font=("Inter", 24 * -1),
+        justify="center"
     )
+    update_waiting_text(text_1, "VIDEO 2\nWaiting...", 1000, "text_1")
 
     # Rectangle 3
     rectangle_3 = canvas.create_rectangle(
@@ -268,8 +315,10 @@ def main():
         anchor="nw",
         text="STATUS\nWaiting...",
         fill="#000000",
-        font=("Inter", 24 * -1)
+        font=("Inter", 24 * -1),
+        justify="center"
     )
+    update_waiting_text(text_2, "STATUS\nWaiting...", 1000, "text_2_wait_all")
 
     # Text 3
     text_3 = canvas.create_text(
@@ -278,8 +327,10 @@ def main():
         anchor="nw",
         text="MCU\nWaiting...",
         fill="#000000",
-        font=("Inter", 24 * -1)
+        font=("Inter", 24 * -1),
+        justify="center"
     )
+    update_waiting_text(text_3, "MCU\nWaiting...", 1000, "text_3")
 
     # Text 4
     text_4 = canvas.create_text(
@@ -288,8 +339,10 @@ def main():
         anchor="nw",
         text="VIDEO 1\nWaiting...",
         fill="#FFFFFF",
-        font=("Inter", 24 * -1)
+        font=("Inter", 24 * -1),
+        justify="center"
     )
+    update_waiting_text(text_4, "VIDEO 1\nWaiting...", 1000, "text_4")
 
     # Text 5
     text_5 = canvas.create_text(
@@ -315,11 +368,6 @@ def main():
             print("Finding Bluetooth Com")
             com = find_com()
 
-        # Bluetooth is found, show it visually
-        canvas.itemconfig(text_3, text="MCU\nReady!")
-        canvas.itemconfig(text_3, fill="#FFFFFF")
-        canvas.itemconfig(rectangle_4, fill="#45AC2C")
-
         # Establish a bluetooth connection
         baud = 9600
         ser_out = start_bluetooth(com, baud)
@@ -328,6 +376,27 @@ def main():
             ser_out = start_bluetooth(com, baud)
         connected_bluetooth = True
         print(f"Connected via {com}")
+
+        # Bluetooth is found, show it visually
+        text_states["text_3"] = False
+        canvas.itemconfig(text_3, text="MCU\nReady!")
+        canvas.itemconfig(text_3, fill="#FFFFFF")
+        canvas.itemconfig(rectangle_4, fill="#45AC2C")
+
+        # Cameras not ready?
+        text_states["text_2_wait_all"] = False
+        text_states["text_2_wait_mcu"] = False
+        if connected_cameras < 2:
+            canvas.itemconfig(text_2, text="STATUS\nWaiting for cameras...")
+            update_waiting_text(text_2, "STATUS\nWaiting for cameras...", 1000, "text_2_wait_cam")
+        
+        # Cameras ready?
+        else:
+            canvas.itemconfig(text_2, text="STATUS\nReady! Hit the button\non the MCU to start!")
+            canvas.itemconfig(text_2, fill="#FFFFFF")
+            canvas.itemconfig(rectangle_3, fill="#45AC2C")
+        resize_canvas()
+        
 
         # Continuously poll for start packet
         # Not needed...
@@ -356,7 +425,7 @@ def main():
                 # Good to go?
                 if connected_cameras > 1:
                     terminate_bluetooth = True
-                    next_window()
+                    window.after(0,next_window)
 
                 # Not good to go
                 else:
@@ -378,6 +447,22 @@ def main():
         cameras = open_cameras(camera_indices)
         connected_cameras = len(camera_indices)
         print(f"Debug: Found {connected_cameras} cameras")
+
+        # Cameras not ready?
+        text_states["text_2_wait_all"] = False
+        text_states["text_2_wait_cam"] = False
+        if connected_bluetooth is False:
+            canvas.itemconfig(text_2, text="STATUS\nWaiting for MCU...")
+            update_waiting_text(text_2, "STATUS\nWaiting for MCU...", 1000, "text_2_wait_mcu")
+        
+        # Cameras ready?
+        else:
+            canvas.itemconfig(text_2, text="STATUS\nReady! Hit the button\non the MCU to start!")
+            canvas.itemconfig(text_2, fill="#FFFFFF")
+            canvas.itemconfig(rectangle_3, fill="#45AC2C")
+        resize_canvas()
+
+        # Update camera feeds in the main thread
         if not terminate_bluetooth:
             window.after(1, start_updating_cameras)  # 1 milisecond
 
@@ -385,21 +470,49 @@ def main():
         #video_stream_1 = capture_camera(camera_indices[0])
         #video_stream_2 = capture_camera(camera_indices[1])
 
-        # Replace the rectangles with images
+    # Container method for updating camera feeds      
     def start_updating_cameras():
         canvas.delete(text_1)
         canvas.delete(text_4)
+        text_states["text_1"] = False
+        text_states["text_4"] = False
+        global cur_cam_1_idx, cur_cam_2_idx
+        cur_cam_1_idx = 0
+        cur_cam_2_idx = 1
         update_camera_feeds()
+    
+    # Click to switch camera feeds
+    def switch_camera_feed_1(event):
+        global connected_cameras
+        if connected_cameras < 3:
+            return
+        global cur_cam_1_idx, cur_cam_2_idx
+        cur_cam_1_idx = (cur_cam_1_idx + 1) % connected_cameras
+        if cur_cam_1_idx == cur_cam_2_idx:
+            cur_cam_1_idx = (cur_cam_1_idx + 1) % connected_cameras
+    def switch_camera_feed_2(event):
+        global connected_cameras
+        if connected_cameras < 3:
+            return
+        global cur_cam_1_idx, cur_cam_2_idx
+        cur_cam_2_idx = (cur_cam_2_idx + 1) % connected_cameras
+        if cur_cam_1_idx == cur_cam_2_idx:
+            cur_cam_2_idx = (cur_cam_2_idx + 1) % connected_cameras
+    
+    # Bind click events to the rectangles
+    canvas.tag_bind(rectangle_1, "<Button-1>", switch_camera_feed_1)
+    canvas.tag_bind(rectangle_2, "<Button-1>", switch_camera_feed_2)
     
     def update_camera_feeds():
         global terminate_bluetooth, cameras
         global camera_width, camera_height
-        captured_frame = get_frame_from_camera(cameras[0], camera_width, camera_height)
+        global cur_cam_1_idx, cur_cam_2_idx
+        captured_frame = get_frame_from_camera(cameras[cur_cam_1_idx], camera_width, camera_height)
         canvas.itemconfig(rectangle_1, image=captured_frame)
         canvas.rectangle_1 = captured_frame  # Prevent garbage collection
         canvas.coords(rectangle_1, canvas_width * 0.020, canvas_height * 0.429)
-        if connected_cameras > 1:               # THIS IS MODIFIED FOR TESTING!!!
-            captured_frame = get_frame_from_camera(cameras[1], camera_width, camera_height)
+        if connected_cameras > 1:
+            captured_frame = get_frame_from_camera(cameras[cur_cam_2_idx], camera_width, camera_height)
             canvas.itemconfig(rectangle_2, image=captured_frame)
             canvas.rectangle_2 = captured_frame  # Prevent garbage collection
             canvas.coords(rectangle_2, canvas_width * 0.517, canvas_height * 0.429)
@@ -416,7 +529,19 @@ def main():
 
         # Open the window
         close_window(window, width, height, x, y, False)
-        gui_recording.main(ser_out)
+        global cur_cam_1_idx, cur_cam_2_idx, cameras
+        close_unused_cameras()
+        gui_recording.main(ser_out, cameras[cur_cam_1_idx], cameras[cur_cam_2_idx])
+    
+    def close_unused_cameras():
+        global cameras, cur_cam_1_idx, cur_cam_2_idx, connected_cameras
+        if connected_cameras < 3:
+            return
+        for i in range(connected_cameras):
+            if i == cur_cam_1_idx or i == cur_cam_2_idx:
+                continue
+            close_camera(cameras[i])
+        
 
     # Start the camera finding on a separate thread
     camera_thread = threading.Thread(target = start_cameras)
