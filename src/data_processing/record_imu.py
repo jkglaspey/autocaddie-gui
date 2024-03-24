@@ -2,7 +2,7 @@ import time
 import json
 from data_processing.serial_bluetooth_communication import receive_packet
 from gui_module.build import gui_recording
-from algorithms.cv.convert_video_to_display import reset_images_folder, save_images_to_folder
+from algorithms.cv.convert_video_to_display import images
 
 # Bluetooth container
 def receive_imu_data(ser_out):
@@ -27,7 +27,7 @@ def receive_imu_data(ser_out):
 
         # Record prep data
         if line == "PREP":
-            reset_images_folder()
+            images = []
             while terminate_bluetooth is False and line != "SWING":
 
                 # Scan in 2 lines of input. Test each to see if order messed up
@@ -73,7 +73,6 @@ def receive_imu_data(ser_out):
                 return
             
             # Save the images
-            save_images_to_folder()         # MOVE THIS TO PROCESSING GUI STEP!!
             gui_recording.notify_end_videos()
 
             # Write prep data for Q1

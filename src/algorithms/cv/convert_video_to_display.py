@@ -27,15 +27,16 @@ def update_cameras(cameras, width, height):
         camera.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 
 global images
-
+images = []
 def reset_images_folder():
     global images
     images = []
-    #directory_path = "camera_data"
-    #try:
-    #    shutil.rmtree(directory_path)
-    #except Exception as e:
-    #    print(f"Error deleting directory '{directory_path}': {e}")
+    directory_path = r"data_processing/camera_data"
+    try:
+        os.system(f"rmdir /S /Q \"{directory_path}\"")
+        os.makedirs(directory_path, exist_ok=True)
+    except Exception as e:
+        print(f"Error deleting directory '{directory_path}': {e}")
 
 def get_frame_from_camera(camera, width, height, save_image=False):
     _, frame = camera.read()
@@ -51,12 +52,20 @@ def get_frame_from_camera(camera, width, height, save_image=False):
     return photo
 
 def save_images_to_folder():
+    global images
     cam = 0
     pathname = r"data_processing\camera_data"
     if not os.path.exists(pathname):
         os.makedirs(pathname)
+
+    pads = "00"
     for i, image in enumerate(images):
-        print(f"Saving image! {(i//2)}")
-        image_filename = os.path.join(pathname, f"{cam}-{(i//2)}.png")
+        if i == 20:
+            pads == "0"
+        elif i == 200:
+            pads == ""
+        image_filename = os.path.join(pathname, f"{cam}-{pads}{(i//2)}.png")
         cv2.imwrite(image_filename, cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
         cam = 1 - cam
+
+    images = []

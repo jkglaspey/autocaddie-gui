@@ -4,13 +4,15 @@
 
 
 from pathlib import Path
-#from gui_module.build import gui_recording
+from gui_module.build import gui_generating_results
 import json
 import threading
 from PIL import Image, ImageTk
 from data_processing.serial_bluetooth_communication import stop_bluetooth
 from data_processing.record_imu import send_end_signal
-from algorithms.cv.convert_video_to_display import close_camera, close_cameras, get_frame_from_camera
+from algorithms.cv.convert_video_to_display import close_cameras, get_frame_from_camera
+from algorithms.cv.camera_recorder import start_recording, stop_recording, change_dims
+import time
 
 # Explicit imports to satisfy Flake8
 from tkinter import Tk, Canvas, Entry, Text, Button, PhotoImage
@@ -72,7 +74,8 @@ def window_event(window):
         return 0, 0
 
 def notify_end_bluetooth():
-    global terminate_bluetooth, imu_received, ser_out, text_states
+    print("Bluetooth ended!")
+    global terminate_bluetooth, imu_received, ser_out, text_states, video_received
     imu_received = True
     terminate_bluetooth = True
     stop_bluetooth(ser_out)
@@ -82,27 +85,63 @@ def notify_end_bluetooth():
     if video_received == True:
         finish_recording()
 
+global start_recording_event
+start_recording_event = threading.Event()
 def notify_start_videos():
-    global save_image
+    global save_image, start_recording_event
     save_image = True
+    start_recording_event.set()
 
 def notify_end_videos():
-    global video_received, save_image
+    print("Videos ended!")
+    global video_received, save_image, imu_received
     video_received = True
     save_image = False
     if imu_received == True:
         finish_recording()
 
+def update_camera_feed(frame, canvas, window, width, height, rectangle, id):
+    window.after(0, update_camera_frames(frame, canvas, width, height, rectangle, id))
+
+def update_camera_frames(frame, canvas, width, height, rectangle, id):
+    global canvas_width, canvas_height
+    if id == 0:
+        captured_frame = frame
+        canvas.itemconfig(rectangle, image=captured_frame)
+        canvas.rectangle_1 = captured_frame  # Prevent garbage collection
+        canvas.coords(rectangle, canvas_width * 0.020, canvas_height * 0.429)
+    else:
+        captured_frame = frame
+        canvas.itemconfig(rectangle, image=captured_frame)
+        canvas.rectangle_2 = captured_frame  # Prevent garbage collection
+        canvas.coords(rectangle, canvas_width * 0.517, canvas_height * 0.429)
+
+
+global end_event
+end_event = threading.Event()
 def finish_recording():
-    print("\n\nCollected Data!\n\nThis is where the next transition would be.")
-    global cameras
-    close_cameras(cameras)
+    print("Finished Recording Data!")
+    global finished_recording, end_event
+    finished_recording = True
+    end_event.set()
+
+def start_recording_thread(recorder_thread_0, recorder_thread_1, i1, i2, width, height):
+    recorder_thread_0 = start_recording(i1, r"data_processing\video_data\output_1.mp4", width, height, 0)
+    recorder_thread_1 = start_recording(i2, r"data_processing\video_data\output_2.mp4", width, height, 1)
+    return recorder_thread_0, recorder_thread_1
+
+def stop_recording_thread(recorder_thread_0, recorder_thread_1):
+    if recorder_thread_0:
+        stop_recording(recorder_thread_0)
+    if recorder_thread_1:
+        stop_recording(recorder_thread_1)
 
 def main(ser_out_ref, camera_1, camera_2):
     global ser_out
     ser_out = ser_out_ref
 
     saved_state = load_window_state()
+    global width, height, x, y
     width = 0
     height = 0
     x = 0
@@ -114,10 +153,14 @@ def main(ser_out_ref, camera_1, camera_2):
     
     window = create_window(width, height, fullscreen, x, y, maximized)
 
+    global window_ref
+    window_ref = window
+
     # Recording status
-    global imu_received, video_received
+    global imu_received, video_received, finished_recording
     imu_received = False
     video_received = False
+    finished_recording = False
 
     # Saving images?
     global save_image
@@ -220,6 +263,11 @@ def main(ser_out_ref, camera_1, camera_2):
         global camera_width, camera_height
         camera_width = (int)(canvas_width * 0.464)
         camera_height = (int)(canvas_height * 0.535)
+        nonlocal recorder_thread_0, recorder_thread_1
+        if recorder_thread_0:
+            change_dims(recorder_thread_0, camera_width, camera_height)
+        if recorder_thread_1:
+            change_dims(recorder_thread_1, camera_width, camera_height)
 
         # Center Text 2 and Text 3
         rect_3_x1, rect_3_y1, rect_3_x2, rect_3_y2 = canvas.coords(rectangle_3)
@@ -260,8 +308,8 @@ def main(ser_out_ref, camera_1, camera_2):
                 new_text = initial_text[:-3] + "." * (dots % 4)
                 canvas.itemconfig(text_item, text=new_text)
                 dots += 1
-                if not imu_received or not video_received:
-                    canvas.after(delay, update_text)
+                if not imu_received and window.winfo_exists():
+                    canvas.after(delay, lambda: update_text() if window.winfo_exists() else None)
             # Only 1 time text will be animated. Use this to update boxes
             elif id == "text_mcu":
                 canvas.itemconfig(text_3, text="MCU\nReady!")
@@ -350,24 +398,53 @@ def main(ser_out_ref, camera_1, camera_2):
         font=("Inter SemiBold", 24 * -1)
     )
 
-    def update_cameras():
-        global camera_width, camera_height
-        global imu_received, video_received
-        global save_image
-        captured_frame = get_frame_from_camera(camera_1, camera_width, camera_height, save_image)
-        canvas.itemconfig(rectangle_1, image=captured_frame)
-        canvas.rectangle_1 = captured_frame  # Prevent garbage collection
-        canvas.coords(rectangle_1, canvas_width * 0.020, canvas_height * 0.429)
-        captured_frame = get_frame_from_camera(camera_2, camera_width, camera_height, save_image)
-        canvas.itemconfig(rectangle_2, image=captured_frame)
-        canvas.rectangle_2 = captured_frame  # Prevent garbage collection
-        canvas.coords(rectangle_2, canvas_width * 0.517, canvas_height * 0.429)
-        if not video_received:
-            window.after(17, update_cameras)  # 60 FPS
-    update_cameras()
+    recorder_thread_0 = None
+    recorder_thread_1 = None
+    def start_recording_local():
 
+        # Start recording
+        nonlocal recorder_thread_0, recorder_thread_1
+        recorder_thread_0.set_recording_to_true()
+        recorder_thread_1.set_recording_to_true()
+        
+        # Sleep for 3 seconds (in this thread!)
+        time.sleep(3)
+
+        # Call the camera to stop recording
+        stop_recording_thread(recorder_thread_0, recorder_thread_1)
+
+        # Cameras finished! Give 1 second, then set variable
+        time.sleep(1)
+        end_thread.start()
+        notify_end_videos()
+
+    def initialize_camera_thread():
+        nonlocal recorder_thread_0, recorder_thread_1
+        global camera_width, camera_height
+        recorder_thread_0, recorder_thread_1 = start_recording_thread(recorder_thread_0, recorder_thread_1, camera_1, camera_2, camera_width, camera_height)
+        recorder_thread_0.keep_reference(window, canvas, rectangle_1)
+        recorder_thread_1.keep_reference(window, canvas, rectangle_2)
+        global save_image, start_recording_event
+        while save_image is False:
+            start_recording_event.wait()
+        start_recording_local()
+    record_camera_thread = threading.Thread(target = initialize_camera_thread)
+    record_camera_thread.start()
+
+    def wait_to_end():
+        global end_event, finish_recording
+        while not finish_recording:
+            end_event.wait()
+        window.after(0,next_window)
+    end_thread = threading.Thread(target = wait_to_end)
+
+    def next_window():
+        close_cameras(cameras)
+        close_window(window_ref, width, height, x, y, False)
+        gui_generating_results.main()
+        
     # Iterate until data is received
     window.mainloop()
 
 if __name__ == "__main__":
-    main()
+    main(None, None, None)

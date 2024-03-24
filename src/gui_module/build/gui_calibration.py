@@ -13,6 +13,7 @@ from data_processing.record_imu import receive_imu_data
 from data_processing.find_serial_port import find_com
 from algorithms.cv.find_valid_camera_indices import find_camera_indices
 from algorithms.cv.convert_video_to_display import open_cameras, close_cameras, close_camera, get_frame_from_camera
+from cv2 import CAP_PROP_FPS
 
 # from tkinter import *
 # Explicit imports to satisfy Flake8
@@ -126,11 +127,12 @@ def main():
     canvas.pack(fill="both", expand=True)
 
     # Initialize dimensions
-    global camera_width, camera_height, canvas_width, canvas_height
+    global camera_width, camera_height, canvas_width, canvas_height, fps_delay
     canvas_width = canvas.winfo_width()
     canvas_height = canvas.winfo_height()
     camera_width = (int)(canvas_width * 0.464)
     camera_height = (int)(canvas_height * 0.535)
+    fps_delay = 17
 
     # Resize background image
     def resize_background(event=None):
@@ -246,8 +248,8 @@ def main():
                 new_text = initial_text[:-3] + "." * (dots % 4)
                 canvas.itemconfig(text_item, text=new_text)
                 dots += 1
-                if not terminate_bluetooth:
-                    canvas.after(delay, update_text)
+                if not terminate_bluetooth and window.winfo_exists():
+                    canvas.after(delay, lambda: update_text() if window.winfo_exists() else None)
 
         update_text()
 
@@ -356,7 +358,6 @@ def main():
 
     # Bluetooth container
     def bluetooth_serial():
-        print("Entered bluetooth serial")
 
         # Ensure bluetooth initialized correctly
         global ser_out, terminate_bluetooth, connected_bluetooth
@@ -365,14 +366,12 @@ def main():
         # Find the correct out port
         com = find_com()
         while com is None and terminate_bluetooth is False:
-            print("Finding Bluetooth Com")
             com = find_com()
 
         # Establish a bluetooth connection
         baud = 9600
         ser_out = start_bluetooth(com, baud)
         while ser_out is None and terminate_bluetooth is False:
-            print("Starting Bluetooth")
             ser_out = start_bluetooth(com, baud)
         connected_bluetooth = True
         print(f"Connected via {com}")
@@ -433,13 +432,11 @@ def main():
 
     # Camera initializing method
     def start_cameras():
-        print("Entered Start Cameras")
 
         # Get valid camera indices
         global terminate_bluetooth, connected_cameras
         camera_indices = find_camera_indices()
         while len(camera_indices) < 2:
-            print("Will retry looking for cameras")
             camera_indices = find_camera_indices()
             if terminate_bluetooth == True:
                 return
@@ -476,9 +473,10 @@ def main():
         canvas.delete(text_4)
         text_states["text_1"] = False
         text_states["text_4"] = False
-        global cur_cam_1_idx, cur_cam_2_idx
+        global cur_cam_1_idx, cur_cam_2_idx, fps_delay
         cur_cam_1_idx = 0
         cur_cam_2_idx = 1
+        fps_delay = (int)((999 // min(cameras[cur_cam_1_idx].get(CAP_PROP_FPS), cameras[cur_cam_2_idx].get(CAP_PROP_FPS))) + 1)
         update_camera_feeds()
     
     # Click to switch camera feeds
@@ -486,38 +484,41 @@ def main():
         global connected_cameras
         if connected_cameras < 3:
             return
-        global cur_cam_1_idx, cur_cam_2_idx
+        global cur_cam_1_idx, cur_cam_2_idx, fps_delay
         cur_cam_1_idx = (cur_cam_1_idx + 1) % connected_cameras
         if cur_cam_1_idx == cur_cam_2_idx:
             cur_cam_1_idx = (cur_cam_1_idx + 1) % connected_cameras
+        fps_delay = (int)((999 // min(cameras[cur_cam_1_idx].get(CAP_PROP_FPS), cameras[cur_cam_2_idx].get(CAP_PROP_FPS))) + 1)
     def switch_camera_feed_2(event):
         global connected_cameras
         if connected_cameras < 3:
             return
-        global cur_cam_1_idx, cur_cam_2_idx
+        global cur_cam_1_idx, cur_cam_2_idx, fps_delay
         cur_cam_2_idx = (cur_cam_2_idx + 1) % connected_cameras
         if cur_cam_1_idx == cur_cam_2_idx:
             cur_cam_2_idx = (cur_cam_2_idx + 1) % connected_cameras
+        fps_delay = (int)((999 // min(cameras[cur_cam_1_idx].get(CAP_PROP_FPS), cameras[cur_cam_2_idx].get(CAP_PROP_FPS))) + 1)
     
     # Bind click events to the rectangles
     canvas.tag_bind(rectangle_1, "<Button-1>", switch_camera_feed_1)
     canvas.tag_bind(rectangle_2, "<Button-1>", switch_camera_feed_2)
     
     def update_camera_feeds():
-        global terminate_bluetooth, cameras
-        global camera_width, camera_height
-        global cur_cam_1_idx, cur_cam_2_idx
-        captured_frame = get_frame_from_camera(cameras[cur_cam_1_idx], camera_width, camera_height)
-        canvas.itemconfig(rectangle_1, image=captured_frame)
-        canvas.rectangle_1 = captured_frame  # Prevent garbage collection
-        canvas.coords(rectangle_1, canvas_width * 0.020, canvas_height * 0.429)
-        if connected_cameras > 1:
-            captured_frame = get_frame_from_camera(cameras[cur_cam_2_idx], camera_width, camera_height)
-            canvas.itemconfig(rectangle_2, image=captured_frame)
-            canvas.rectangle_2 = captured_frame  # Prevent garbage collection
-            canvas.coords(rectangle_2, canvas_width * 0.517, canvas_height * 0.429)
+        global terminate_bluetooth
         if not terminate_bluetooth:
-            window.after(17, update_camera_feeds)  # 60 FPS
+            global camera_width, camera_height, cameras
+            global cur_cam_1_idx, cur_cam_2_idx, fps_delay
+            captured_frame = get_frame_from_camera(cameras[cur_cam_1_idx], camera_width, camera_height)
+            canvas.itemconfig(rectangle_1, image=captured_frame)
+            canvas.rectangle_1 = captured_frame  # Prevent garbage collection
+            canvas.coords(rectangle_1, canvas_width * 0.020, canvas_height * 0.429)
+            if connected_cameras > 1:
+                captured_frame = get_frame_from_camera(cameras[cur_cam_2_idx], camera_width, camera_height)
+                canvas.itemconfig(rectangle_2, image=captured_frame)
+                canvas.rectangle_2 = captured_frame  # Prevent garbage collection
+                canvas.coords(rectangle_2, canvas_width * 0.517, canvas_height * 0.429)
+            if window.winfo_exists():
+                window.after(fps_delay, lambda: update_camera_feeds() if window.winfo_exists() else None)  # 60 FPS
 
     # Move to the recording frame
     def next_window():
