@@ -11,6 +11,7 @@ from algorithms.cv.convert_video_to_display import save_images_to_folder, reset_
 from algorithms.cv.video_manipulation import convert_frames_to_video
 from PIL import Image, ImageTk
 from data_processing.video_player import VideoPlayer
+from neural_network.process_videos import execute_process_video
 
 # from tkinter import *
 # Explicit imports to satisfy Flake8
@@ -548,7 +549,7 @@ def main():
         
         # No was pressed
         if not confirm_status:
-            window.after(0, next_window)
+            window.after(0, calibration_window)
             return
 
         # Get a collection of frames to display to the user
@@ -588,12 +589,23 @@ def main():
         # Also, create mp4 files
         video_0.convert_frames_to_video(r"data_processing\video_data\trimmed_out_0.mp4", frames_0)
         video_1.convert_frames_to_video(r"data_processing\video_data\trimmed_out_1.mp4", frames_1)
-        print("Finished!!")
+        
+        # Now, process with AI!
+        execute_process_video()
 
-    def next_window():
+        # And finally, proceed to next window!
+        window.after(0, next_window)
+
+    def calibration_window():
         from gui_module.build import gui_calibration
         close_window(window, width, height, x, y)
         gui_calibration.main()
+
+    def next_window():
+        #from gui_module.build import gui_results_summary
+        #close_window(window, width, height, x, y)
+        #gui_results_summary.main()
+        print("Ended gui_generating_results.py!")
 
     # Start the video playback as a thread
     initial_data_thread = threading.Thread(target = thread_sequencing_initial)
