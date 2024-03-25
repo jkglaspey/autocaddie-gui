@@ -435,8 +435,9 @@ def process_amateur_video(video_path, angles_data, model, sequence_length, outpu
     plt.legend()
     plot_filename = graphs_with_video_path + '_angle1.png'
     plt.savefig(plot_filename)
+    plt.clf()
     
-
+    plt.figure(figsize=(8, 4))
     plt.plot(frames, hip_rotation_actual, label='Actual')
     plt.plot(frames, hip_rotation_predicted, label='Predicted')
     plt.xlabel('Frame')
@@ -444,8 +445,9 @@ def process_amateur_video(video_path, angles_data, model, sequence_length, outpu
     plt.legend()
     plot_filename = graphs_with_video_path + '_angle2.png'
     plt.savefig(plot_filename)
+    plt.clf()
 
-    
+    plt.figure(figsize=(8, 4))
     plt.plot(frames, shoulder_rotation_actual, label='Actual')
     plt.plot(frames, shoulder_rotation_predicted, label='Predicted')
     plt.xlabel('Frame')
@@ -453,6 +455,7 @@ def process_amateur_video(video_path, angles_data, model, sequence_length, outpu
     plt.legend()
     plot_filename = graphs_with_video_path + '_angle3.png'
     plt.savefig(plot_filename)
+    plt.clf()
 
 
 ### PROCESS VIDEO 1

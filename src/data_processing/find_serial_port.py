@@ -1,44 +1,66 @@
-def find_com():
-    print("find_com needs to be implemented...")
-    return 'COM3'
-
-import bluetooth
 import serial.tools.list_ports
+import bluetooth
+import serial
 
-def find_device_com():
-    # Method 1: PyBluez
-    # Discover Bluetooth devices
-    devices = bluetooth.discover_devices()
-
-    # Iterate over discovered devices
-    for device_address in devices:
-        device_name_lookup = bluetooth.lookup_name(device_address)
-        print(device_name_lookup)
-
-        # This doesn't work... I think version error?
-        #services = bluetooth.find_service(address=device_address)
-        #for service in services:
-        #    print("Service Name:", service["name"])
-        #    print("Service Class:", service["service-classes"])
-        #    print("Host:", service["host"])
-        #    print("Port:", service["port"])
-        #    print("Description:", service["description"])
-        #    print("Protocol:", service["protocol"])
-        #    print("")
-
-    # Method 2: PySerial
-    available_ports = serial.tools.list_ports.comports()
-    bluetooth_ports = []
-    for port in available_ports:
-        print(f"{port.name} = {port.description}")
+def find_bt_device_by_name(device_name):
+    devices = bluetooth.discover_devices(lookup_names=True)
+    for addr, name in devices:
+        if name == device_name:
+            return addr
     return None
 
-# Example usage
-if __name__ == "__main__":
-    device_name = "HC-06"
-    device_uuid = ""
-    com_port = find_device_com()
-    if com_port:
-        print(f"The COM port connected to '{device_name}' is {com_port}")
+def find_com_port(bt_address):
+    com_ports = serial.tools.list_ports.comports()
+    for port, desc, hwid in com_ports:
+        if bt_address.replace(':', '').upper() in hwid.upper():
+            return port
+    return None
+
+# Connect to the COM port. Wrapper function
+def connect_to_device(device_name):
+    bt_address = find_bt_device_by_name(device_name)
+    if bt_address:
+        com_port = find_com_port(bt_address)
+        if com_port:
+            try:
+                #ser = serial.Serial(com_port)
+                #print(f"Connected to {device_name} on COM port {com_port}")
+                #return ser  # Return the Serial object for further use
+                return com_port
+
+            except serial.SerialException:
+                print(f"Failed to connect to {device_name}")
+                return None
+        else:
+            print(f"COM port for {device_name} not found")
+            return None
     else:
-        print(f"No COM port found for device '{device_name}'")
+        print(f"{device_name} not found")
+        return None
+
+# Done through other files
+def read_data_from_device(ser):
+    if ser:
+        try:
+            while True:
+                # Read a line from the serial port
+                line = ser.readline().decode().strip()
+
+                # Print the received data
+                print("Received:", line)
+        except KeyboardInterrupt:
+            # Close the serial port when Ctrl+C is pressed
+            ser.close()
+    else:
+        print("No valid serial connection")
+
+def find_com():
+    device_name = "HC-06"
+    com_port = connect_to_device(device_name)
+    if com_port:
+        print(f"Debug: Connected via {com_port}")
+        return com_port
+        #read_data_from_device(device_name)
+    else:
+        print("Debug: Could not connect to COM!")
+        return None
