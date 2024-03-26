@@ -433,7 +433,7 @@ def process_amateur_video(video_path, angles_data, model, sequence_length, outpu
     plt.xlabel('Frame')
     plt.ylabel('Front Arm Angle')
     plt.legend()
-    plot_filename = graphs_with_video_path + '_angle1.png'
+    plot_filename = graphs_with_video_path + '_angle_arm.png'
     plt.savefig(plot_filename)
     plt.clf()
     
@@ -443,7 +443,7 @@ def process_amateur_video(video_path, angles_data, model, sequence_length, outpu
     plt.xlabel('Frame')
     plt.ylabel('Hip Rotation')
     plt.legend()
-    plot_filename = graphs_with_video_path + '_angle2.png'
+    plot_filename = graphs_with_video_path + '_angle_hip.png'
     plt.savefig(plot_filename)
     plt.clf()
 
@@ -453,7 +453,7 @@ def process_amateur_video(video_path, angles_data, model, sequence_length, outpu
     plt.xlabel('Frame')
     plt.ylabel('Shoulder Rotation')
     plt.legend()
-    plot_filename = graphs_with_video_path + '_angle3.png'
+    plot_filename = graphs_with_video_path + '_angle_shoulder.png'
     plt.savefig(plot_filename)
     plt.clf()
 
@@ -497,7 +497,7 @@ def execute_process_video():
     process_video_1()
     process_video_2()
     end_time = time.time()
-    print(f"Total time to execute process_videos.py = {end_time - current_time}")
+    print(f"\n\n\nTotal time to process videos using Neural Network = {end_time - current_time}\n\n\n")
 
 if __name__ == "__main__":
     execute_process_video()
