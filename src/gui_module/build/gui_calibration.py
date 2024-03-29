@@ -14,6 +14,7 @@ from data_processing.find_serial_port import find_com
 from algorithms.cv.find_valid_camera_indices import find_camera_indices
 from algorithms.cv.convert_video_to_display import open_cameras, close_cameras, close_camera, get_frame_from_camera
 from cv2 import CAP_PROP_FPS
+import time
 
 # from tkinter import *
 # Explicit imports to satisfy Flake8

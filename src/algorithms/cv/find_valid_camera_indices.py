@@ -6,7 +6,7 @@ def find_camera_indices():
     camera_indices = []
     for idx in range(10):
         try:
-            camera = cv2.VideoCapture(idx)
+            camera = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
             if camera.isOpened():
                 print(f"Camera found at index {idx}")
                 camera_indices.append(idx)

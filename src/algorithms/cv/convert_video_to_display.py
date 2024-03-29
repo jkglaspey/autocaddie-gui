@@ -6,8 +6,9 @@ from PIL import Image, ImageTk
 def open_cameras(camera_indices):
     cameras = []
     for idx in camera_indices:
-        camera = cv2.VideoCapture(idx)
+        camera = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
         if camera.isOpened():
+            camera.set(cv2.CAP_PROP_FPS, 60)
             cameras.append(camera)
         else:
             print(f"Failed to open camera at index {idx}")
