@@ -181,7 +181,7 @@ def main():
         canvas.coords(text_2, canvas_width * 0.179, canvas_height * 0.183)
         canvas.itemconfig(text_3, font=("Inter", font_size * -1))
         canvas.coords(text_3, canvas_width * 0.683, canvas_height * 0.183)
-        canvas.itemconfig(text_5, font=("Inter", font_size * -1))
+        canvas.itemconfig(text_5, font=("Inter SemiBold", font_size * -1))
         canvas.coords(text_5, canvas_width * 0.02, canvas_height * 0.027)
 
         # Images

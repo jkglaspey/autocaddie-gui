@@ -4,144 +4,478 @@
 
 
 from pathlib import Path
+import json
+import threading
+import time
+from PIL import Image, ImageTk
+from data_processing.camera_holder import CameraHolder
+import os
 
 # from tkinter import *
 # Explicit imports to satisfy Flake8
-from tkinter import Tk, Canvas, Entry, Text, Button, PhotoImage
+from tkinter import Tk, ttk, Canvas, Entry, Text, Button, PhotoImage
+import tkinter as tk
 
 
 OUTPUT_PATH = Path(__file__).parent
 ASSETS_PATH = OUTPUT_PATH / Path(r".\assets\frame2")
 
-
 def relative_to_assets(path: str) -> Path:
     return ASSETS_PATH / Path(path)
 
+def save_window_state(width, height, fullscreen, x, y, state):
+    with open(r"gui_module\build\assets\window_state.json", "w") as f:
+        json.dump({"width": width, "height": height, "fullscreen": fullscreen, "x": x, "y": y, "maximized": state}, f)
 
-window = Tk()
+def load_window_state():
+    try:
+        with open(r"gui_module\build\assets\window_state.json", "r") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return None
+    
+def create_window(width, height, fullscreen, x, y, maximized):
+    window = Tk()
+    window.geometry(f"{width}x{height}")
+    window.configure(bg="#FFFFFF")
+    window.geometry("+{}+{}".format(x, y))
 
-window.geometry("797x448")
-window.configure(bg = "#FFFFFF")
+    # Maximized or fullscreen?
+    if maximized:
+        window.state('zoomed')
+    if fullscreen:
+        window.attributes("-fullscreen", True)
+    
+    # Save window state before closing
+    window.protocol("WM_DELETE_WINDOW", lambda: close_window(window, width, height, x, y))
+    
+    return window
 
+def close_window(window, width, height, x, y):
+    if window.attributes("-fullscreen") == 0:
+            x, y = get_window_position(window)
+    save_window_state(width, height, window.attributes("-fullscreen"), x, y, window.state() == 'zoomed')
+    global terminate
+    terminate = True
+    window.destroy()
 
-canvas = Canvas(
-    window,
-    bg = "#FFFFFF",
-    height = 448,
-    width = 797,
-    bd = 0,
-    highlightthickness = 0,
-    relief = "ridge"
-)
+def get_window_position(window):
+    geometry_string = window.geometry()
+    x, y = map(int, geometry_string.split('+')[1:])
+    return x, y
 
-canvas.place(x = 0, y = 0)
-image_image_1 = PhotoImage(
-    file=relative_to_assets("image_1.png"))
-image_1 = canvas.create_image(
-    398.0,
-    224.0,
-    image=image_image_1
-)
+def window_event(window):
+    if window.state() != 'zoomed':
+        return window.winfo_width(), window.winfo_height()
+    else:
+        return 0, 0
 
-canvas.create_rectangle(
-    16.0,
-    192.0,
-    386.0,
-    432.0,
-    fill="#45AC2B",
-    outline="")
+def main(camera_holder_1, camera_holder_2):
 
-canvas.create_text(
-    32.0,
-    276.0,
-    anchor="nw",
-    text="VIDEO 1\n<RECORDING>",
-    fill="#FFFFFF",
-    font=("Inter", 24 * -1)
-)
+    saved_state = load_window_state()
+    width = 0
+    height = 0
+    x = 0
+    y = 0
+    if saved_state:
+        width, height, fullscreen, x, y, maximized = saved_state["width"], saved_state["height"], saved_state["fullscreen"], saved_state["x"], saved_state["y"], saved_state["maximized"]
+    else:
+        width, height, fullscreen, x, y, maximized = 797, 448, False, 0, 0, False
+    
+    window = create_window(width, height, fullscreen, x, y, maximized)
 
-canvas.create_rectangle(
-    411.0,
-    192.0,
-    781.0,
-    432.0,
-    fill="#45AC2C",
-    outline="")
+    # Fullscreen
+    def toggle_fullscreen(event=None):
+        state = not window.attributes("-fullscreen")
+        window.attributes("-fullscreen", state)
+        return "break"
 
-canvas.create_text(
-    427.0,
-    294.0,
-    anchor="nw",
-    text="<REPLACE WITH GRAPH>",
-    fill="#FFFFFF",
-    font=("Inter", 24 * -1)
-)
+    def end_fullscreen(event=None):
+        window.attributes("-fullscreen", False)
+        return "break"
 
-canvas.create_rectangle(
-    229.0,
-    48.0,
-    569.0,
-    113.0,
-    fill="#FFFFFF",
-    outline="")
+    # Bind F11 key to toggle fullscreen
+    window.bind("<F11>", toggle_fullscreen)
+    # Bind Escape key to end fullscreen
+    window.bind("<Escape>", end_fullscreen)
 
-canvas.create_text(
-    318.0,
-    69.0,
-    anchor="nw",
-    text="HIP ROTATION",
-    fill="#000000",
-    font=("Inter", 24 * -1)
-)
+    # Body
+    canvas = Canvas(
+        window,
+        bg = "#FFFFFF",
+        height = 448,
+        width = 797,
+        bd = 0,
+        highlightthickness = 0,
+        relief = "ridge"
+    )
+    canvas.pack(fill="both", expand=True)
 
-canvas.create_text(
-    16.0,
-    12.0,
-    anchor="nw",
-    text="AutoCaddie",
-    fill="#1E1E1E",
-    font=("Inter SemiBold", 24 * -1)
-)
+    # Initialize dimensions
+    global camera_width, camera_height, canvas_width, canvas_height
+    canvas_width = canvas.winfo_width()
+    canvas_height = canvas.winfo_height()
+    camera_width = (int)(canvas_width * 0.464)
+    camera_height = (int)(canvas_height * 0.535)
+    if camera_width == 0:
+        camera_width = 1
+    if camera_height == 0:
+        camera_height = 1
 
-canvas.create_text(
-    319.0,
-    120.0,
-    anchor="nw",
-    text="Score: XX.XX%",
-    fill="#1E1E1E",
-    font=("Inter", 24 * -1)
-)
+    # Globals
+    global terminate, set_frame_1, frame_1, photo_1, cur_cam_idx, pause
+    terminate = False
+    set_frame_1 = threading.Event()
+    set_frame_2 = threading.Event()
+    frame_1 = None
+    photo_1 = None
+    cur_cam_idx = 0
+    pause = False
 
-button_image_1 = PhotoImage(
-    file=relative_to_assets("button_1.png"))
-button_1 = Button(
-    image=button_image_1,
-    borderwidth=0,
-    highlightthickness=0,
-    command=lambda: print("button_1 clicked"),
-    relief="flat"
-)
-button_1.place(
-    x=48.0,
-    y=48.0,
-    width=92.0,
-    height=72.0
-)
+    # Objects
+    image_image_1 = Image.open(relative_to_assets("image_1.png"))
+    photo_image_1 = ImageTk.PhotoImage(image_image_1)
+    image_1 = canvas.create_image(0, 0, anchor="nw", image=photo_image_1)
 
-button_image_2 = PhotoImage(
-    file=relative_to_assets("button_2.png"))
-button_2 = Button(
-    image=button_image_2,
-    borderwidth=0,
-    highlightthickness=0,
-    command=lambda: print("button_2 clicked"),
-    relief="flat"
-)
-button_2.place(
-    x=657.0,
-    y=48.0,
-    width=92.0,
-    height=72.0
-)
-window.resizable(False, False)
-window.mainloop()
+    # Video Rectangle
+    dark_black_image = Image.new("RGB", (370, 240), "#1E1E1E")
+    photo_image_dark_black = ImageTk.PhotoImage(dark_black_image)
+    rectangle_1 = canvas.create_image(16, 192, anchor="nw", image=photo_image_dark_black)
+    canvas.rectangle_1 = photo_image_dark_black
+    canvas.rectangle_image_1 = dark_black_image
+
+    # Graph Rectangle
+    rectangle_2 = None
+    canvas.rectangle_2 = None
+    canvas.rectangle_image_2 = None
+    def put_graph():
+        nonlocal rectangle_2, canvas
+        global cur_cam_idx
+        if cur_cam_idx == 0:
+            if os.path.exists(r"neural_network\graphs\trimmed_out_0_angle_hip.png"):
+                graph_image = Image.open(r"neural_network\graphs\trimmed_out_0_angle_hip.png")
+                photo_graph_image = ImageTk.PhotoImage(graph_image)
+                rectangle_2 = canvas.create_image(411, 192, anchor="nw", image=photo_graph_image)
+                canvas.rectangle_2 = photo_graph_image
+                canvas.rectangle_image_2 = graph_image
+            else:
+                rectangle_2 = canvas.create_image(411, 192, anchor="nw", image=photo_image_dark_black)
+                canvas.rectangle_2 = photo_image_dark_black
+                canvas.rectangle_image_2 = dark_black_image
+        else:
+            if os.path.exists(r"neural_network\graphs\trimmed_out_1_angle_hip.png"):
+                graph_image = Image.open(r"neural_network\graphs\trimmed_out_1_angle_hip.png")
+                photo_graph_image = ImageTk.PhotoImage(graph_image)
+                rectangle_2 = canvas.create_image(411, 192, anchor="nw", image=photo_graph_image)
+                canvas.rectangle_2 = photo_graph_image
+                canvas.rectangle_image_2 = graph_image
+            else:
+                rectangle_2 = canvas.create_image(411, 192, anchor="nw", image=photo_image_dark_black)
+                canvas.rectangle_2 = photo_image_dark_black
+                canvas.rectangle_image_2 = dark_black_image
+    put_graph()
+
+    # White text rectangle
+    rectangle_3 = canvas.create_rectangle(
+        229.0,
+        48.0,
+        569.0,
+        113.0,
+        fill="#FFFFFF",
+        outline="")
+
+    # Metric Label
+    text_2 = canvas.create_text(
+        273.0,
+        69.0,
+        anchor="nw",
+        text="HIP ROTATION",
+        fill="#000000",
+        font=("Inter", 24 * -1),
+        justify="center"
+    )
+
+    # AutoCaddie title
+    text_1 = canvas.create_text(
+        16.0,
+        12.0,
+        anchor="nw",
+        text="AutoCaddie",
+        fill="#1E1E1E",
+        font=("Inter SemiBold", 24 * -1),
+        justify="center"
+    )
+
+    # Left button
+    button_image_1 = PhotoImage(
+        file=relative_to_assets("button_1.png"))
+    button_1 = Button(
+        image=button_image_1,
+        borderwidth=0,
+        highlightthickness=0,
+        command=lambda: click_left_button(),
+        relief="flat"
+    )
+    #button_1.place(
+    #    x=48.0,
+    #    y=48.0,
+    #    width=92.0,
+    #    height=72.0
+    #)
+    button_1.place(relx = 0.118, rely = 0.187, anchor="center")
+
+    # Right button
+    button_image_2 = PhotoImage(
+        file=relative_to_assets("button_2.png"))
+    button_2 = Button(
+        image=button_image_2,
+        borderwidth=0,
+        highlightthickness=0,
+        command=lambda: click_right_button(),
+        relief="flat"
+    )
+    #button_2.place(
+    #    x=657.0,
+    #    y=48.0,
+    #    width=92.0,
+    #    height=72.0
+    #)
+    button_2.place(relx = 0.882, rely = 0.187, anchor="center")
+
+    # Slider
+    slider = None
+    def create_slider():
+        nonlocal slider, rectangle_1
+        global cur_cam_idx, video_1, video_2
+
+        # Destroy the existing slider
+        if slider is not None:
+            slider.destroy()
+            slider = None
+
+        if cur_cam_idx == 0 and video_1 is not None:
+            slider = ttk.Scale(window, from_=0, to=video_1.numFrames - 1, value=0, orient=tk.HORIZONTAL, command=lambda value: slider_update_video(*video_1.getFrame(int(float(value))), int(float(value))))
+        elif cur_cam_idx == 1 and video_2 is not None:
+            slider = ttk.Scale(window, from_=0, to=video_2.numFrames - 1, value=0, orient=tk.HORIZONTAL, command=lambda value: slider_update_video(*video_2.getFrame(int(float(value))), int(float(value))))
+
+        if slider is not None:
+            global canvas_width, canvas_height
+            slider_width = canvas_width // 2
+            slider_x = canvas_width // 4
+            slider_y = canvas_height * 0.35
+            slider.place(x=slider_x, y=slider_y, width=slider_width)
+
+    # Resize background image
+    def resize_background(event=None):
+
+        # Resize the image to fit the canvas size
+        resized_image_1 = image_image_1.resize((canvas_width, canvas_height))
+
+        # Convert the resized image to a Tkinter-compatible format
+        photo_image_1 = ImageTk.PhotoImage(resized_image_1)
+
+        # Update the canvas with the resized image
+        canvas.itemconfig(image_1, image=photo_image_1)
+        canvas.image_1 = photo_image_1  # Keep a reference to prevent garbage collection
+
+        # Resize elements in window
+    def resize_canvas(event=None):
+
+        # Window
+        temp_width, temp_height = window_event(window)
+        if temp_width > 0 and temp_height > 0:
+            width = temp_width
+            height = temp_height
+        if window.attributes("-fullscreen") == 0:
+            x, y = get_window_position(window)
+
+        # Get the size of the canvas
+        global canvas_width, canvas_height
+        canvas_width = canvas.winfo_width()
+        canvas_height = canvas.winfo_height()
+
+        # Resize the background image
+        resize_background()
+
+        # Rectangles
+        nonlocal rectangle_1
+        new_cords = [canvas_width * 0.287, canvas_height * 0.107, canvas_width * 0.713, canvas_height * 0.252]
+        canvas.coords(rectangle_3, *new_cords)
+
+        # Text
+        text_x = canvas_width / 18.667
+        text_y = canvas_height / 18.667
+        font_size = int(min(text_x, text_y))
+
+        canvas.itemconfig(text_1, font=("Inter SemiBold", font_size * -1))
+        canvas.coords(text_1, canvas_width * 0.02, canvas_height * 0.027)
+
+        canvas.itemconfig(text_2, font=("Inter", font_size * -1))
+        rect_x1, rect_y1, rect_x2, rect_y2 = canvas.coords(rectangle_3)
+        rect_center_x = (rect_x1 + rect_x2) / 2
+        rect_center_y = (rect_y1 + rect_y2) / 2
+        text_2_bbox = canvas.bbox(text_2)
+        text_2_width = text_2_bbox[2] - text_2_bbox[0]
+        text_2_height = text_2_bbox[3] - text_2_bbox[1]
+        text_2_x = rect_center_x - text_2_width / 2
+        text_2_y = rect_center_y - text_2_height / 2
+        canvas.coords(text_2, text_2_x, text_2_y)
+                
+        # Images
+        global camera_width, camera_height
+        camera_width = (int)(canvas_width * 0.464)
+        camera_height = (int)(canvas_height * 0.535)
+
+        # Rectangles!
+        canvas.coords(rectangle_1, canvas_width * 0.020, canvas_height * 0.429)
+        canvas.coords(rectangle_2, canvas_width * 0.516, canvas_height * 0.429)
+        resized_rectangle = canvas.rectangle_image_2.resize((camera_width, camera_height))
+        photo_rectangle_image = ImageTk.PhotoImage(resized_rectangle)
+        canvas.itemconfig(rectangle_2, image = photo_rectangle_image)
+        canvas.rectangle_2 = photo_rectangle_image
+        global pause
+        if pause:
+            resized_rectangle = canvas.rectangle_image_1.resize((camera_width, camera_height))
+            photo_rectangle_image = ImageTk.PhotoImage(resized_rectangle)
+            canvas.itemconfig(rectangle_1, image = photo_rectangle_image)
+            canvas.rectangle_1 = photo_rectangle_image
+
+        # Slider
+        nonlocal slider
+        if slider is not None:
+            slider_width = canvas_width // 2
+            slider_x = canvas_width // 4
+            slider_y = canvas_height * 0.35
+            slider.place(x=slider_x, y=slider_y, width=slider_width)
+
+        # Cameras?
+        global video_1, video_2
+        if video_1:
+            video_1.set_dims(camera_width, camera_height)
+        if video_2:
+            video_2.set_dims(camera_width, camera_height)
+
+        # Button 1
+        button_1_width = (int)(canvas_width * 0.115)
+        button_1_height = (int)(canvas_height * 0.161)
+        resized_button_image_1 = Image.open(relative_to_assets("button_1.png")).resize((button_1_width, button_1_height))
+        button_image_1 = ImageTk.PhotoImage(resized_button_image_1)
+        button_1.config(image=button_image_1)
+        button_1.image = button_image_1
+        
+        # Button 2
+        button_2_width = (int)(canvas_width * 0.115)
+        button_2_height = (int)(canvas_height * 0.161)
+        resized_button_image_2 = Image.open(relative_to_assets("button_2.png")).resize((button_2_width, button_2_height))
+        button_image_2 = ImageTk.PhotoImage(resized_button_image_2)
+        button_2.config(image=button_image_2)
+        button_2.image = button_image_2
+    
+    # Bind resizing events
+    canvas.bind("<Configure>", resize_canvas)
+
+    def switch_cameras(event):
+        # See if this is an unpause action
+        global pause
+        if pause:
+            pause = False
+            return
+
+        # Swap cameras
+        global cur_cam_idx, cur_frame
+        cur_cam_idx = 1 - cur_cam_idx
+        cur_frame = 0
+
+        # Swap sliders
+        create_slider()
+
+        # Swap graphs
+        put_graph()
+
+        # Fix sizes
+        resize_canvas()
+
+    # Bind click events to the rectangles
+    canvas.tag_bind(rectangle_1, "<Button-1>", switch_cameras)
+    canvas.tag_bind(rectangle_2, "<Button-1>", switch_cameras)
+
+    # Thread to initialize camera feeds
+    def initialize_camera_holders():
+
+        # Initialize the camera holders
+        global video_1, video_2, cur_cam_idx, camera_width, camera_height
+        if camera_holder_1 is None or camera_holder_2 is None:
+            video_1 = CameraHolder(r"neural_network\angle_videos\amateur_swing_analysis0.mp4", 0)
+            video_2 = CameraHolder(r"neural_network\angle_videos\amateur_swing_analysis1.mp4", 1)
+            video_1.set_dims(camera_width, camera_height)
+            video_2.set_dims(camera_width, camera_height)
+            video_1.open_camera()
+            video_2.open_camera()
+        else:
+            video_1 = camera_holder_1
+            video_2 = camera_holder_2
+
+        # Create 2 thread to loop for the cameras
+        video_1_thread = threading.Thread(target = update_video_loop)
+        video_1_thread.start()
+
+        # Create a slider
+        window.after(0, lambda: create_slider())
+    
+    def update_video_loop():
+        global terminate, video_1, video_2, fps, cur_frame, cur_cam_idx, pause
+        cur_frame = 0
+        while not terminate:
+            if cur_cam_idx == 0:
+                # Get from video 1
+                if video_1 is not None and pause is False:
+                    frame, photo = video_1.getFrame(cur_frame)
+                    cur_frame += 1
+                    if cur_frame == video_1.numFrames:
+                        cur_frame = 0
+                    if frame is not None:
+                        window.after(0, update_video(frame, photo))
+                time.sleep(1 / video_1.fps + 0.01)
+            else:
+                # Get from video 2
+                if video_2 is not None and pause is False:
+                    frame, photo = video_2.getFrame(cur_frame)
+                    cur_frame += 1
+                    if cur_frame == video_2.numFrames:
+                        cur_frame = 0
+                    if frame is not None:
+                        window.after(0, update_video(frame, photo))
+                time.sleep(1 / video_2.fps + 0.01)
+    
+    def update_video(frame, photo):
+        global terminate
+        if not terminate:
+            canvas.itemconfig(rectangle_1, image=photo)
+            canvas.rectangle_1 = photo
+            canvas.rectangle_image_1 = frame
+
+    def slider_update_video(frame, photo, idx):
+        global pause
+        if not pause:
+            pause = True
+        if idx != -1:
+            global cur_frame
+            cur_frame = idx
+        window.after(0,update_video(frame, photo))
+        
+    def click_left_button():
+        global video_1, video_2
+        from gui_module.build import gui_results_arm
+        close_window(window, width, height, x, y)
+        gui_results_arm.main(video_1, video_2)
+
+    def click_right_button():
+        global video_1, video_2
+        from gui_module.build import gui_results_shoulder
+        close_window(window, width, height, x, y)
+        gui_results_shoulder.main(video_1, video_2)
+
+    # Start threads
+    start_camera_objects = threading.Thread(target = initialize_camera_holders)
+    start_camera_objects.start()
+    window.mainloop()

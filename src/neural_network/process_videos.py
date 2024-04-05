@@ -490,14 +490,19 @@ def process_video_2():
     sequence_length = model.input_shape[1]  # Get the sequence length from the model's input shape
     process_amateur_video(amateur_video_path, amateur_angles_data, model, sequence_length, output_video_path)
 
-def execute_process_video():
+def execute_process_video(callToGUI):
     current_time = time.time()
     process_videos()
     process_amateur_swing_data()
     process_video_1()
     process_video_2()
     end_time = time.time()
-    print(f"\n\n\nTotal time to process videos using Neural Network = {end_time - current_time}\n\n\n")
+    print(f"Total time to process videos using Neural Network = {end_time - current_time}")
+    
+    # Call back to the GUI
+    if callToGUI:
+        from gui_module.build.gui_generating_results import finish_processing_videos_from_AI
+        finish_processing_videos_from_AI()
 
 if __name__ == "__main__":
-    execute_process_video()
+    execute_process_video(False)

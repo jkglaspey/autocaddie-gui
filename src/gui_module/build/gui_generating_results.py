@@ -88,8 +88,11 @@ def update_canvas_image(frame, video_player):
         video_player.canvas.rectangle_image_3 = video_player.image
         video_player.canvas.coords(video_player.rectangle, canvas_width * 0.517, canvas_height * 0.429)
 
+def finish_processing_videos_from_AI():
+    global finished_processing_videos
+    finish_processing_videos.set()
+
 def main():
-    print("Entered main!")
     saved_state = load_window_state()
     width = 0
     height = 0
@@ -349,7 +352,6 @@ def main():
         click_button_event.set()
     
     def push_slider_button():
-        print("Made it to slider button function!")
         global click_slider_button_event
         click_slider_button_event.set()
 
@@ -512,9 +514,10 @@ def main():
             canvas.coords(rectangle_3, canvas_width * 0.517, canvas_height * 0.429)
 
     # Threading sequencing
-    global click_button_event, click_slider_button_event
+    global click_button_event, click_slider_button_event, finish_processing_videos
     click_button_event = threading.Event()
     click_slider_button_event = threading.Event()
+    finish_processing_videos = threading.Event()
     video_0 = None
     video_1 = None
     def thread_sequencing_initial():
@@ -591,9 +594,12 @@ def main():
         video_1.convert_frames_to_video(r"data_processing\video_data\trimmed_out_1.mp4", frames_1)
         
         # Now, process with AI!
-        execute_process_video()
+        execute_process_video(True)
 
-        # And finally, proceed to next window!
+        # Wait here for event to finish
+        global finish_processing_videos
+        if not terminate_early:
+            finish_processing_videos.wait()
         window.after(0, next_window)
 
     def calibration_window():
@@ -602,10 +608,9 @@ def main():
         gui_calibration.main()
 
     def next_window():
-        #from gui_module.build import gui_results_summary
-        #close_window(window, width, height, x, y)
-        #gui_results_summary.main()
-        print("Ended gui_generating_results.py!")
+        from gui_module.build import gui_results_main
+        close_window(window, width, height, x, y)
+        gui_results_main.main(None, None)
 
     # Start the video playback as a thread
     initial_data_thread = threading.Thread(target = thread_sequencing_initial)
