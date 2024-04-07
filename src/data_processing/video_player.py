@@ -1,6 +1,7 @@
 import moviepy.editor as mp
 import cv2
 from PIL import Image, ImageTk
+import threading
 
 class VideoPlayer():
 
@@ -78,9 +79,14 @@ class VideoPlayer():
         return captured_image, photo 
 
     def convert_frames_to_video(self, path, frames):
-        this_clip = mp.VideoFileClip(self.path)
-        clip = mp.ImageSequenceClip(frames, fps=this_clip.fps)
-        clip.write_videofile(path, codec='libx264')
+        with mp.VideoFileClip(self.path) as original_clip:
+            new_clip = mp.ImageSequenceClip(frames, fps=original_clip.fps)
+            with new_clip as clip:
+                clip.write_videofile(path, codec='libx264')
+        #threads = threading.enumerate()
+        #print("\n\nAFTER Active Threads:")
+        #for thread in threads:
+        #    print(f"- {thread.name}")
 
     def get_clip_length(self):
         return mp.VideoFileClip(self.path).duration

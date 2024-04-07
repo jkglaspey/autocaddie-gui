@@ -4,6 +4,7 @@ from gui_module.build import gui_help
 from tkinter import Tk, Canvas, Button, PhotoImage
 from PIL import Image, ImageTk
 import json
+import os
 
 OUTPUT_PATH = Path(__file__).parent
 ASSETS_PATH = OUTPUT_PATH / Path(r".\assets\frame11")
@@ -35,15 +36,18 @@ def create_window(width, height, fullscreen, x, y, maximized):
         window.attributes("-fullscreen", True)
     
     # Save window state before closing
-    window.protocol("WM_DELETE_WINDOW", lambda: close_window(window, width, height, x, y))
+    window.protocol("WM_DELETE_WINDOW", lambda: close_window(window, width, height, x, y, True))
     
     return window
 
-def close_window(window, width, height, x, y):
+def close_window(window, width, height, x, y, forceShutdown = False):
     if window.attributes("-fullscreen") == 0:
             x, y = get_window_position(window)
     save_window_state(width, height, window.attributes("-fullscreen"), x, y, window.state() == 'zoomed')
     window.destroy()
+
+    if forceShutdown:
+        os._exit(1)
 
 def get_window_position(window):
     geometry_string = window.geometry()

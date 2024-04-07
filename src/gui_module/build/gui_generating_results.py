@@ -9,9 +9,12 @@ import threading
 import time
 from algorithms.cv.convert_video_to_display import save_images_to_folder, reset_images_folder
 from algorithms.cv.video_manipulation import convert_frames_to_video
+from data_processing.serial_bluetooth_communication import stop_bluetooth
+from algorithms.cv.convert_video_to_display import close_cameras
 from PIL import Image, ImageTk
 from data_processing.video_player import VideoPlayer
 from neural_network.process_videos import execute_process_video
+import os
 
 # from tkinter import *
 # Explicit imports to satisfy Flake8
@@ -49,17 +52,26 @@ def create_window(width, height, fullscreen, x, y, maximized):
         window.attributes("-fullscreen", True)
     
     # Save window state before closing
-    window.protocol("WM_DELETE_WINDOW", lambda: close_window(window, width, height, x, y))
+    window.protocol("WM_DELETE_WINDOW", lambda: close_window(window, width, height, x, y, True, True))
     
     return window
 
-def close_window(window, width, height, x, y):
+def close_window(window, width, height, x, y, close, forceShutdown = False):
     if window.attributes("-fullscreen") == 0:
             x, y = get_window_position(window)
     save_window_state(width, height, window.attributes("-fullscreen"), x, y, window.state() == 'zoomed')
     global terminate_early
     terminate_early = True
+
+    if close:
+        global ser_out, cameras
+        stop_bluetooth(ser_out)
+        close_cameras(cameras)
+
     window.destroy()
+
+    if forceShutdown:
+        os._exit(1)
 
 def get_window_position(window):
     geometry_string = window.geometry()
@@ -92,7 +104,10 @@ def finish_processing_videos_from_AI():
     global finished_processing_videos
     finish_processing_videos.set()
 
-def main():
+def main(ser_out_ref = None, cameras_ref = None):
+    global ser_out, cameras
+    ser_out = ser_out_ref
+    cameras = cameras_ref
     saved_state = load_window_state()
     width = 0
     height = 0
@@ -524,13 +539,11 @@ def main():
         # Create video player objects
         global camera_width, camera_height
         nonlocal video_0, video_1
-        video_0 = VideoPlayer(r"data_processing\video_data\output_1.mp4", canvas, window, rectangle_2, camera_width, camera_height, 0)
-        video_1 = VideoPlayer(r"data_processing\video_data\output_2.mp4", canvas, window, rectangle_3, camera_width, camera_height, 1)
+        video_0 = VideoPlayer(r"data_processing\video_data\output_3.mp4", canvas, window, rectangle_2, camera_width, camera_height, 0)
+        video_1 = VideoPlayer(r"data_processing\video_data\output_4.mp4", canvas, window, rectangle_3, camera_width, camera_height, 1)
         min_time = min(video_0.get_clip_length(), video_1.get_clip_length())
         video_0.set_trim_length(min_time)
         video_1.set_trim_length(min_time)
-
-        print("Created objects!")
 
         # Play videos on loop
         play_video_0_thread = threading.Thread(target = video_0.play_clip_on_loop)
@@ -570,7 +583,6 @@ def main():
         click_slider_button_event.clear()
         
         # Wait for last frame to be selected
-        print("Got first frame to be selected!")
         global frame_idx_var
         frames_0 = frames_0[frame_idx_var:]
         frames_1 = frames_1[frame_idx_var:]
@@ -582,7 +594,6 @@ def main():
         click_slider_button_event.clear()
 
         # Update frames to new collection
-        print("Got last frame to be selected!")
         frames_0 = frames_0[:frame_idx_var]
         frames_1 = frames_1[:frame_idx_var]
 
@@ -603,14 +614,17 @@ def main():
         window.after(0, next_window)
 
     def calibration_window():
+        # ADD TEXT FOR "CLICK BUTTON TO RESTART SWING"
+        # Until then, this just takes you back to calibration...
         from gui_module.build import gui_calibration
-        close_window(window, width, height, x, y)
+        close_window(window, width, height, x, y, False)
         gui_calibration.main()
 
     def next_window():
         from gui_module.build import gui_results_main
-        close_window(window, width, height, x, y)
-        gui_results_main.main(None, None)
+        close_window(window, width, height, x, y, False)
+        global ser_out, cameras
+        gui_results_main.main(None, None, None, None, ser_out, cameras)
 
     # Start the video playback as a thread
     initial_data_thread = threading.Thread(target = thread_sequencing_initial)

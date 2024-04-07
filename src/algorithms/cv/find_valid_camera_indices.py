@@ -8,7 +8,7 @@ def find_camera_indices():
         try:
             camera = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
             if camera.isOpened():
-                print(f"Camera found at index {idx}")
+                print(f"Debug: Camera found at index {idx}")
                 camera_indices.append(idx)
                 camera.release()
         except cv2.error as e:

@@ -6,6 +6,7 @@ from algorithms.cv.convert_video_to_display import images
 
 # Bluetooth container
 def receive_imu_data(ser_out):
+    print("Debug: Receiving IMU data.")
 
     # Store bluetooth state
     global terminate_bluetooth

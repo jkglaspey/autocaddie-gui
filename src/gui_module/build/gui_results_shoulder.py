@@ -7,6 +7,9 @@ from pathlib import Path
 import json
 import threading
 import time
+from data_processing.serial_bluetooth_communication import stop_bluetooth, receive_packet_async
+from algorithms.cv.convert_video_to_display import close_cameras
+from data_processing.record_imu import receive_imu_data
 from PIL import Image, ImageTk
 from data_processing.camera_holder import CameraHolder
 import os
@@ -47,17 +50,25 @@ def create_window(width, height, fullscreen, x, y, maximized):
         window.attributes("-fullscreen", True)
     
     # Save window state before closing
-    window.protocol("WM_DELETE_WINDOW", lambda: close_window(window, width, height, x, y))
+    window.protocol("WM_DELETE_WINDOW", lambda: close_window(window, width, height, x, y, True, True))
     
     return window
 
-def close_window(window, width, height, x, y):
+def close_window(window, width, height, x, y, close, forceShutdown = False):
     if window.attributes("-fullscreen") == 0:
             x, y = get_window_position(window)
     save_window_state(width, height, window.attributes("-fullscreen"), x, y, window.state() == 'zoomed')
     global terminate
     terminate = True
+
+    if close:
+        global ser_out, cameras
+        stop_bluetooth(ser_out)
+        close_cameras(cameras)
     window.destroy()
+
+    if forceShutdown:
+        os._exit(1)
 
 def get_window_position(window):
     geometry_string = window.geometry()
@@ -70,8 +81,14 @@ def window_event(window):
     else:
         return 0, 0
 
-def main(camera_holder_1, camera_holder_2):
-
+def main(camera_holder_1 = None, camera_holder_2 = None, camera_holder_3 = None, camera_holder_4 = None, ser_out_ref = None, cameras_ref = None):
+    threads = threading.enumerate()
+    print("\n\nAFTER Active Threads:")
+    for thread in threads:
+        print(f"- {thread.name}")
+    global ser_out, cameras
+    ser_out = ser_out_ref
+    cameras = cameras_ref
     saved_state = load_window_state()
     width = 0
     height = 0
@@ -152,8 +169,8 @@ def main(camera_holder_1, camera_holder_2):
         nonlocal rectangle_2, canvas
         global cur_cam_idx
         if cur_cam_idx == 0:
-            if os.path.exists(r"neural_network\graphs\trimmed_out_0_angle_shoulder.png"):
-                graph_image = Image.open(r"neural_network\graphs\trimmed_out_0_angle_shoulder.png")
+            if os.path.exists(r"neural_network\graphs\trimmed_out_0_angle_shoulder_act.png"):
+                graph_image = Image.open(r"neural_network\graphs\trimmed_out_0_angle_shoulder_act.png")
                 photo_graph_image = ImageTk.PhotoImage(graph_image)
                 rectangle_2 = canvas.create_image(411, 192, anchor="nw", image=photo_graph_image)
                 canvas.rectangle_2 = photo_graph_image
@@ -162,9 +179,31 @@ def main(camera_holder_1, camera_holder_2):
                 rectangle_2 = canvas.create_image(411, 192, anchor="nw", image=photo_image_dark_black)
                 canvas.rectangle_2 = photo_image_dark_black
                 canvas.rectangle_image_2 = dark_black_image
-        else:
-            if os.path.exists(r"neural_network\graphs\trimmed_out_1_angle_shoulder.png"):
-                graph_image = Image.open(r"neural_network\graphs\trimmed_out_1_angle_shoulder.png")
+        elif cur_cam_idx == 1:
+            if os.path.exists(r"neural_network\graphs\trimmed_out_1_angle_shoulder_act.png"):
+                graph_image = Image.open(r"neural_network\graphs\trimmed_out_1_angle_shoulder_act.png")
+                photo_graph_image = ImageTk.PhotoImage(graph_image)
+                rectangle_2 = canvas.create_image(411, 192, anchor="nw", image=photo_graph_image)
+                canvas.rectangle_2 = photo_graph_image
+                canvas.rectangle_image_2 = graph_image
+            else:
+                rectangle_2 = canvas.create_image(411, 192, anchor="nw", image=photo_image_dark_black)
+                canvas.rectangle_2 = photo_image_dark_black
+                canvas.rectangle_image_2 = dark_black_image
+        elif cur_cam_idx == 2:
+            if os.path.exists(r"neural_network\graphs\skeleton_video0_angle_shoulder_pred.png"):
+                graph_image = Image.open(r"neural_network\graphs\skeleton_video0_angle_shoulder_pred.png")
+                photo_graph_image = ImageTk.PhotoImage(graph_image)
+                rectangle_2 = canvas.create_image(411, 192, anchor="nw", image=photo_graph_image)
+                canvas.rectangle_2 = photo_graph_image
+                canvas.rectangle_image_2 = graph_image
+            else:
+                rectangle_2 = canvas.create_image(411, 192, anchor="nw", image=photo_image_dark_black)
+                canvas.rectangle_2 = photo_image_dark_black
+                canvas.rectangle_image_2 = dark_black_image
+        elif cur_cam_idx == 3:
+            if os.path.exists(r"neural_network\graphs\skeleton_video1_angle_shoulder_pred.png"):
+                graph_image = Image.open(r"neural_network\graphs\skeleton_video1_angle_shoulder_pred.png")
                 photo_graph_image = ImageTk.PhotoImage(graph_image)
                 rectangle_2 = canvas.create_image(411, 192, anchor="nw", image=photo_graph_image)
                 canvas.rectangle_2 = photo_graph_image
@@ -246,7 +285,7 @@ def main(camera_holder_1, camera_holder_2):
     slider = None
     def create_slider():
         nonlocal slider, rectangle_1
-        global cur_cam_idx, video_1, video_2
+        global cur_cam_idx, video_1, video_2, video_3, video_4
 
         # Destroy the existing slider
         if slider is not None:
@@ -257,6 +296,10 @@ def main(camera_holder_1, camera_holder_2):
             slider = ttk.Scale(window, from_=0, to=video_1.numFrames - 1, value=0, orient=tk.HORIZONTAL, command=lambda value: slider_update_video(*video_1.getFrame(int(float(value))), int(float(value))))
         elif cur_cam_idx == 1 and video_2 is not None:
             slider = ttk.Scale(window, from_=0, to=video_2.numFrames - 1, value=0, orient=tk.HORIZONTAL, command=lambda value: slider_update_video(*video_2.getFrame(int(float(value))), int(float(value))))
+        elif cur_cam_idx == 2 and video_3 is not None:
+            slider = ttk.Scale(window, from_=0, to=video_3.numFrames - 1, value=0, orient=tk.HORIZONTAL, command=lambda value: slider_update_video(*video_3.getFrame(int(float(value))), int(float(value))))
+        elif cur_cam_idx == 3 and video_4 is not None:
+            slider = ttk.Scale(window, from_=0, to=video_4.numFrames - 1, value=0, orient=tk.HORIZONTAL, command=lambda value: slider_update_video(*video_4.getFrame(int(float(value))), int(float(value))))
 
         if slider is not None:
             global canvas_width, canvas_height
@@ -312,7 +355,6 @@ def main(camera_holder_1, camera_holder_2):
 
         rect_x1, rect_y1, rect_x2, rect_y2 = canvas.coords(rectangle_3)
         rect_width = rect_x2 - rect_x1
-        rect_height = rect_y2 - rect_y1
         max_font_size = rect_width / 14.1667
         new_font_size = int(min(max_font_size, font_size))
         canvas.itemconfig(text_2, font=("Inter", new_font_size * -1))
@@ -353,11 +395,15 @@ def main(camera_holder_1, camera_holder_2):
             slider.place(x=slider_x, y=slider_y, width=slider_width)
 
         # Cameras?
-        global video_1, video_2
+        global video_1, video_2, video_3, video_4
         if video_1:
             video_1.set_dims(camera_width, camera_height)
         if video_2:
             video_2.set_dims(camera_width, camera_height)
+        if video_3:
+            video_3.set_dims(camera_width, camera_height)
+        if video_4:
+            video_4.set_dims(camera_width, camera_height)
 
         # Button 1
         button_1_width = (int)(canvas_width * 0.115)
@@ -387,8 +433,9 @@ def main(camera_holder_1, camera_holder_2):
 
         # Swap cameras
         global cur_cam_idx, cur_frame
-        cur_cam_idx = 1 - cur_cam_idx
-        cur_frame = 0
+        cur_cam_idx += 1
+        if cur_cam_idx == 4:
+            cur_cam_idx = 0
 
         # Swap sliders
         create_slider()
@@ -407,19 +454,27 @@ def main(camera_holder_1, camera_holder_2):
     def initialize_camera_holders():
 
         # Initialize the camera holders
-        global video_1, video_2, cur_cam_idx, camera_width, camera_height
-        if camera_holder_1 is None or camera_holder_2 is None:
-            video_1 = CameraHolder(r"neural_network\angle_videos\amateur_swing_analysis0.mp4", 0)
-            video_2 = CameraHolder(r"neural_network\angle_videos\amateur_swing_analysis1.mp4", 1)
+        global video_1, video_2, video_3, video_4, camera_width, camera_height
+        if camera_holder_1 is None or camera_holder_2 is None or camera_holder_3 is None or camera_holder_4 is None:
+            video_1 = CameraHolder(r"neural_network\angle_videos\amateur_cam_analysis0.mp4")
+            video_2 = CameraHolder(r"neural_network\angle_videos\amateur_cam_analysis1.mp4")
+            video_3 = CameraHolder(r"neural_network\angle_videos\amateur_swing_analysis0.mp4")
+            video_4 = CameraHolder(r"neural_network\angle_videos\amateur_swing_analysis1.mp4")
             video_1.set_dims(camera_width, camera_height)
             video_2.set_dims(camera_width, camera_height)
+            video_3.set_dims(camera_width, camera_height)
+            video_4.set_dims(camera_width, camera_height)
             video_1.open_camera()
             video_2.open_camera()
+            video_3.open_camera()
+            video_4.open_camera()
         else:
             video_1 = camera_holder_1
             video_2 = camera_holder_2
+            video_3 = camera_holder_3
+            video_4 = camera_holder_4
 
-        # Create 2 thread to loop for the cameras
+        # Create a thread to loop for the cameras
         video_1_thread = threading.Thread(target = update_video_loop)
         video_1_thread.start()
 
@@ -440,7 +495,7 @@ def main(camera_holder_1, camera_holder_2):
                     if frame is not None:
                         window.after(0, update_video(frame, photo))
                 time.sleep(1 / video_1.fps + 0.01)
-            else:
+            elif cur_cam_idx == 1:
                 # Get from video 2
                 if video_2 is not None and pause is False:
                     frame, photo = video_2.getFrame(cur_frame)
@@ -450,6 +505,26 @@ def main(camera_holder_1, camera_holder_2):
                     if frame is not None:
                         window.after(0, update_video(frame, photo))
                 time.sleep(1 / video_2.fps + 0.01)
+            elif cur_cam_idx == 2:
+                # Get from video 3
+                if video_3 is not None and pause is False:
+                    frame, photo = video_3.getFrame(cur_frame)
+                    cur_frame += 1
+                    if cur_frame == video_3.numFrames:
+                        cur_frame = 0
+                    if frame is not None:
+                        window.after(0, update_video(frame, photo))
+                time.sleep(1 / video_3.fps + 0.01)
+            else:
+                # Get from video 4
+                if video_4 is not None and pause is False:
+                    frame, photo = video_4.getFrame(cur_frame)
+                    cur_frame += 1
+                    if cur_frame == video_4.numFrames:
+                        cur_frame = 0
+                    if frame is not None:
+                        window.after(0, update_video(frame, photo))
+                time.sleep(1 / video_4.fps + 0.01)
     
     def update_video(frame, photo):
         global terminate
@@ -466,20 +541,47 @@ def main(camera_holder_1, camera_holder_2):
             global cur_frame
             cur_frame = idx
         window.after(0,update_video(frame, photo))
+    
+    def wait_for_ser_out():
+        global terminate, ser_out
+        while terminate is False:
+            line = receive_packet_async(ser_out)
+            
+            # Idle
+            if line == None:
+                continue
+
+            # We got liftoff!
+            window.after(0, click_recording_button)
+    
+    # Switch to the recording gui
+    def click_recording_button():
+        global ser_out, cameras
+
+        # Start data recording process
+        data_thread = threading.Thread(target = receive_imu_data, args=(ser_out,))
+        data_thread.start()
+
+        # Next window
+        from gui_module.build import gui_recording
+        close_window(window, width, height, x, y, False)
+        gui_recording.main(ser_out, cameras[0], cameras[1])
         
     def click_left_button():
-        global video_1, video_2
+        global video_1, video_2, video_3, video_4, ser_out, cameras
         from gui_module.build import gui_results_hip
-        close_window(window, width, height, x, y)
-        gui_results_hip.main(video_1, video_2)
+        close_window(window, width, height, x, y, False)
+        gui_results_hip.main(video_1, video_2, video_3, video_4, ser_out, cameras)
 
     def click_right_button():
         global video_1, video_2
-        from gui_module.build import gui_calibration
-        close_window(window, width, height, x, y)
-        gui_calibration.main()
-
+        from gui_module.build import gui_home
+        close_window(window, width, height, x, y, True)
+        gui_home.main()
+        
     # Start threads
     start_camera_objects = threading.Thread(target = initialize_camera_holders)
     start_camera_objects.start()
+    listen_for_button = threading.Thread(target = wait_for_ser_out)
+    listen_for_button.start()
     window.mainloop()

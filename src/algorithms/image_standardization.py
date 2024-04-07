@@ -17,7 +17,7 @@ def standardize_frames():
 
             # Fail case: No bounding box for this image
             if bbox is None:
-                print(f"Failed to determine a bounding box for '{filename}'")
+                print(f"Error: Failed to determine a bounding box for '{filename}'")
                 continue
 
             # Crop the image to the bounding box

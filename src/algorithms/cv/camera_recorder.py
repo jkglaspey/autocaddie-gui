@@ -4,8 +4,8 @@ import time
 from PIL import Image, ImageTk
 
 class CameraRecorder(threading.Thread):
-    def __init__(self, camera, output_files, width, height, idx):
-        super().__init__()
+    def __init__(self, camera, output_files, width, height, idx, name):
+        super().__init__(name=name)
         self.camera = camera
         self.output_files = output_files
         self.is_running = False
@@ -34,17 +34,19 @@ class CameraRecorder(threading.Thread):
             ret, frame = recorder.read()
             if ret:
                 self.send_frame_to_gui(frame, self.idx)
+        print("Debug: Starting recording!")
         while self.is_running and self.save:
             ret, frame = recorder.read()
             if ret:
                 self.send_frame_to_gui(frame, self.idx)
                 video_writer.write(frame)
             else:
-                print(f"Missed a frame on cam #{self.idx}")
+                print(f"Error: Missed a frame on cam #{self.idx}")
         self.stop_recording()
 
-    def start_recording(self, recorder, output_file):
+    def start_recording(self, recorder, output_file, parm_fps=30):
         fps = recorder.get(cv2.CAP_PROP_FPS)
+        print(f"Debug: Recording at FPS = {fps}")
         width = int(recorder.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(recorder.get(cv2.CAP_PROP_FRAME_HEIGHT))
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -54,7 +56,7 @@ class CameraRecorder(threading.Thread):
     def stop_recording(self):
         self.is_running = False
         self.save = False
-        self.camera.release()
+        #self.camera.release()
         self.video_writer.release()
     
     def send_frame_to_gui(self, frame, idx):
@@ -65,8 +67,8 @@ class CameraRecorder(threading.Thread):
         photo = ImageTk.PhotoImage(image=resized_image)
         update_camera_feed(photo, self.canvas, self.window, self.width, self.height, self.rectangle, self.idx)
 
-def start_recording(cameras, output_files, width, height, idx):
-    recorder_thread = CameraRecorder(cameras, output_files, width, height, idx)
+def start_recording(cameras, output_files, width, height, idx, name):
+    recorder_thread = CameraRecorder(cameras, output_files, width, height, idx, name)
     recorder_thread.start()
     return recorder_thread
 
@@ -75,6 +77,12 @@ def change_dims(recorder_thread, width, height):
 
 def stop_recording(recorder_thread):
     recorder_thread.stop_recording()
+
+def start_saving(recorder_thread):
+    recorder_thread.save = True
+
+def stop_saving(recorder_thread):
+    recorder_thread.save = False
 
 
 if __name__ == "__main__":

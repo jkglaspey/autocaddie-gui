@@ -1,4 +1,5 @@
 import serial
+import time
 
 # Define the serial port and baudrate globally
 global OUTPORT, BAUDRATE
@@ -16,7 +17,7 @@ def get_serial_info():
 def start_bluetooth(port, baud):
     global connection_in_progress
     try:
-        print(f"Connecting to Serial Port {port} using baudrate {baud}.")
+        print(f"Debug: Connecting to Serial Port {port} using baudrate {baud}.")
         connection_in_progress = True
         ser_out = serial.Serial(port, baud)
         connection_in_progress = False
@@ -36,7 +37,36 @@ def receive_packet(ser_out):
             connection_in_progress = False
             return line_out
         else:
-            print("Serial port is not open.")
+            print("Error: Serial port is not open, and tried to receive packet.")
+            connection_in_progress = False
+            return None
+    except serial.SerialException as e:
+        print(f"Error: {e}")
+        return None
+    
+def receive_packet_async(ser_out):
+    global connection_in_progress
+    try:
+        if ser_out:
+            connection_in_progress = True
+            start_time = time.time()
+            timeout = 0.001  # 1 millisecond timeout
+            while True:
+                if ser_out.in_waiting > 0:
+                    try:
+                        line_out = ser_out.readline().decode().strip()
+                        connection_in_progress = False
+                        return line_out
+                    except serial.SerialException as e:
+                        print(f"Error: {e}")
+                        connection_in_progress = False
+                        return None
+                if time.time() - start_time > timeout:
+                    # Timeout exceeded, return None
+                    connection_in_progress = False
+                    return None
+        else:
+            print("Error: Serial port is not open, and tried to receive packet.")
             connection_in_progress = False
             return None
     except serial.SerialException as e:
@@ -51,10 +81,10 @@ def stop_bluetooth(ser_out):
             # Wait until the connection attempt finishes
             while connection_in_progress:
                 pass
-            print("Closing connection.")
+            print("Debug: Closing serial connection.")
             ser_out.close()
         else:
-            print("Serial port is not open.")
+            print("Error: Serial port is not open, and tried to close serial connection.")
     except serial.SerialException as e:
         print(f"Error: {e}")
 

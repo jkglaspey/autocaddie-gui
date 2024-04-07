@@ -13,6 +13,7 @@ from data_processing.record_imu import send_end_signal
 from algorithms.cv.convert_video_to_display import close_cameras, get_frame_from_camera
 from algorithms.cv.camera_recorder import start_recording, stop_recording, change_dims
 import time
+import os
 
 # Explicit imports to satisfy Flake8
 from tkinter import Tk, Canvas, Entry, Text, Button, PhotoImage
@@ -47,20 +48,23 @@ def create_window(width, height, fullscreen, x, y, maximized):
         window.attributes("-fullscreen", True)
     
     # Save window state before closing
-    window.protocol("WM_DELETE_WINDOW", lambda: close_window(window, width, height, x, y, True))
+    window.protocol("WM_DELETE_WINDOW", lambda: close_window(window, width, height, x, y, True, True))
     
     return window
 
-def close_window(window, width, height, x, y, closeBluetooth):
+def close_window(window, width, height, x, y, closeBluetooth, forceShutdown = False):
     if window.attributes("-fullscreen") == 0:
             x, y = get_window_position(window)
     save_window_state(width, height, window.attributes("-fullscreen"), x, y, window.state() == 'zoomed')
     if closeBluetooth is True:
-        global terminate_bluetooth, ser_out
+        global terminate_bluetooth, ser_out, cameras
         terminate_bluetooth = True
         send_end_signal()
         stop_bluetooth(ser_out)
+        close_cameras(cameras)
     window.destroy()
+    if forceShutdown:
+        os._exit(1)
 
 def get_window_position(window):
     geometry_string = window.geometry()
@@ -74,11 +78,10 @@ def window_event(window):
         return 0, 0
 
 def notify_end_bluetooth():
-    print("Bluetooth ended!")
     global terminate_bluetooth, imu_received, ser_out, text_states, video_received
     imu_received = True
-    terminate_bluetooth = True
-    stop_bluetooth(ser_out)
+    #terminate_bluetooth = True
+    #stop_bluetooth(ser_out)
     # Modify text states
     text_states["text_mcu"] = False
     text_states["text_status"] = False
@@ -93,7 +96,7 @@ def notify_start_videos():
     start_recording_event.set()
 
 def notify_end_videos():
-    print("Videos ended!")
+    print("Debug: Videos finished recording.")
     global video_received, save_image, imu_received
     video_received = True
     save_image = False
@@ -120,23 +123,29 @@ def update_camera_frames(frame, canvas, width, height, rectangle, id):
 global end_event
 end_event = threading.Event()
 def finish_recording():
-    print("Finished Recording Data!")
+    print("Debug: All data is collected!")
     global finished_recording, end_event
     finished_recording = True
     end_event.set()
 
 def start_recording_thread(recorder_thread_0, recorder_thread_1, i1, i2, width, height):
-    recorder_thread_0 = start_recording(i1, r"data_processing\video_data\output_1.mp4", width, height, 0)
-    recorder_thread_1 = start_recording(i2, r"data_processing\video_data\output_2.mp4", width, height, 1)
+    recorder_thread_0 = start_recording(i1, r"data_processing\video_data\output_1.mp4", width, height, 0, "recording_cam_0")
+    recorder_thread_1 = start_recording(i2, r"data_processing\video_data\output_2.mp4", width, height, 1, "recording_cam_1")
     return recorder_thread_0, recorder_thread_1
 
 def stop_recording_thread(recorder_thread_0, recorder_thread_1):
     if recorder_thread_0:
         stop_recording(recorder_thread_0)
+        del recorder_thread_0
     if recorder_thread_1:
         stop_recording(recorder_thread_1)
+        del recorder_thread_1
 
 def main(ser_out_ref, camera_1, camera_2):
+    threads = threading.enumerate()
+    print("\n\nAFTER Active Threads:")
+    for thread in threads:
+        print(f"- {thread.name}")
     global ser_out
     ser_out = ser_out_ref
 
@@ -428,6 +437,7 @@ def main(ser_out_ref, camera_1, camera_2):
         while save_image is False:
             start_recording_event.wait()
         start_recording_local()
+
     record_camera_thread = threading.Thread(target = initialize_camera_thread)
     record_camera_thread.start()
 
@@ -439,9 +449,11 @@ def main(ser_out_ref, camera_1, camera_2):
     end_thread = threading.Thread(target = wait_to_end)
 
     def next_window():
-        close_cameras(cameras)
+        global ser_out, cameras
+        # No longer closing cameras between runs
+        # close_cameras(cameras)
         close_window(window_ref, width, height, x, y, False)
-        gui_generating_results.main()
+        gui_generating_results.main(ser_out, cameras)
         
     # Iterate until data is received
     window.mainloop()

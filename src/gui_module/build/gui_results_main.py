@@ -7,8 +7,12 @@ from pathlib import Path
 import json
 import threading
 import time
+from data_processing.serial_bluetooth_communication import stop_bluetooth, receive_packet_async
+from algorithms.cv.convert_video_to_display import close_cameras
+from data_processing.record_imu import receive_imu_data
 from PIL import Image, ImageTk
 from data_processing.camera_holder import CameraHolder
+import os
 
 # from tkinter import *
 # Explicit imports to satisfy Flake8
@@ -45,17 +49,25 @@ def create_window(width, height, fullscreen, x, y, maximized):
         window.attributes("-fullscreen", True)
     
     # Save window state before closing
-    window.protocol("WM_DELETE_WINDOW", lambda: close_window(window, width, height, x, y))
+    window.protocol("WM_DELETE_WINDOW", lambda: close_window(window, width, height, x, y, True, True))
     
     return window
 
-def close_window(window, width, height, x, y):
+def close_window(window, width, height, x, y, close, forceShutdown = False):
     if window.attributes("-fullscreen") == 0:
             x, y = get_window_position(window)
     save_window_state(width, height, window.attributes("-fullscreen"), x, y, window.state() == 'zoomed')
     global terminate
     terminate = True
+
+    if close:
+        global ser_out, cameras
+        stop_bluetooth(ser_out)
+        close_cameras(cameras)
     window.destroy()
+
+    if forceShutdown:
+        os._exit(1)
 
 def get_window_position(window):
     geometry_string = window.geometry()
@@ -68,8 +80,10 @@ def window_event(window):
     else:
         return 0, 0
 
-def main(camera_holder_1, camera_holder_2):
-
+def main(camera_holder_1 = None, camera_holder_2 = None, camera_holder_3 = None, camera_holder_4 = None, ser_out_ref = None, cameras_ref = None):
+    global ser_out, cameras
+    ser_out = ser_out_ref
+    cameras = cameras_ref
     saved_state = load_window_state()
     width = 0
     height = 0
@@ -301,17 +315,25 @@ def main(camera_holder_1, camera_holder_2):
     def initialize_camera_holders():
 
         # Initialize the camera holders
-        global video_1, video_2, camera_width, camera_height
-        if camera_holder_1 is None or camera_holder_2 is None:
-            video_1 = CameraHolder(r"neural_network\angle_videos\amateur_swing_analysis0.mp4", 0)
-            video_2 = CameraHolder(r"neural_network\angle_videos\amateur_swing_analysis1.mp4", 1)
+        global video_1, video_2, video_3, video_4, camera_width, camera_height
+        if camera_holder_1 is None or camera_holder_2 is None or camera_holder_3 is None or camera_holder_4 is None:
+            video_1 = CameraHolder(r"neural_network\angle_videos\amateur_cam_analysis0.mp4")
+            video_2 = CameraHolder(r"neural_network\angle_videos\amateur_cam_analysis1.mp4")
+            video_3 = CameraHolder(r"neural_network\angle_videos\amateur_swing_analysis0.mp4")
+            video_4 = CameraHolder(r"neural_network\angle_videos\amateur_swing_analysis1.mp4")
             video_1.set_dims(camera_width, camera_height)
             video_2.set_dims(camera_width, camera_height)
+            video_3.set_dims(camera_width, camera_height)
+            video_4.set_dims(camera_width, camera_height)
             video_1.open_camera()
             video_2.open_camera()
+            video_3.open_camera()
+            video_4.open_camera()
         else:
             video_1 = camera_holder_1
             video_2 = camera_holder_2
+            video_3 = camera_holder_3
+            video_4 = camera_holder_4
 
         # Create 2 thread to loop for the cameras
         video_1_thread = threading.Thread(target = update_video_loop_1, args=(video_1.fps,))
@@ -360,17 +382,44 @@ def main(camera_holder_1, camera_holder_2):
             canvas.itemconfig(rectangle_2, image=photo)
             canvas.rectangle_2 = photo
             canvas.rectangle_image_2 = frame
+    
+    def wait_for_ser_out():
+        global terminate, ser_out
+        while terminate is False:
+            line = receive_packet_async(ser_out)
+            
+            # Idle
+            if line == None:
+                continue
+
+            # We got liftoff!
+            window.after(0, click_recording_button)
+    
+    # Switch to the recording gui
+    def click_recording_button():
+        global ser_out, cameras
+
+        # Start data recording process
+        data_thread = threading.Thread(target = receive_imu_data, args=(ser_out,))
+        data_thread.start()
+
+        # Next window
+        from gui_module.build import gui_recording
+        close_window(window, width, height, x, y, False)
+        gui_recording.main(ser_out, cameras[0], cameras[1])
 
     # Switch to right GUI
     def click_right_button():
-        global video_1, video_2
+        global video_1, video_2, video_3, video_4, ser_out, cameras
         from gui_module.build import gui_results_posture
-        close_window(window, width, height, x, y)
-        gui_results_posture.main(video_1, video_2)
+        close_window(window, width, height, x, y, False)
+        gui_results_posture.main(video_1, video_2, video_3, video_4, ser_out, cameras)
 
     # Start threads
     start_camera_objects = threading.Thread(target = initialize_camera_holders)
     start_camera_objects.start()
+    listen_for_button = threading.Thread(target = wait_for_ser_out)
+    listen_for_button.start()
 
     window.mainloop()
 

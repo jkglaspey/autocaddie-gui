@@ -2,7 +2,7 @@ import cv2
 from PIL import Image, ImageTk
 
 class CameraHolder:
-    def __init__(self, path, id):
+    def __init__(self, path):
         self.path = path
         self.cap = None
         self.width = None
@@ -14,6 +14,8 @@ class CameraHolder:
     def open_camera(self):
         self.cap = cv2.VideoCapture(self.path)
         self.fps = self.cap.get(cv2.CAP_PROP_FPS)
+        if self.fps == 0:
+            self.fps = 1
         self.convert_to_frames()
         self.close_camera()
 

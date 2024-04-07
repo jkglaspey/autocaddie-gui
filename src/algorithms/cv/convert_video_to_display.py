@@ -6,15 +6,19 @@ from PIL import Image, ImageTk
 def open_cameras(camera_indices):
     cameras = []
     for idx in camera_indices:
-        camera = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
+        #camera = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
+        camera = cv2.VideoCapture(idx)
         if camera.isOpened():
-            camera.set(cv2.CAP_PROP_FPS, 60)
+            #camera.set(cv2.CAP_PROP_FPS, 30)
             cameras.append(camera)
         else:
-            print(f"Failed to open camera at index {idx}")
+            print(f"Error: Failed to open camera at index {idx}")
     return cameras
 
 def close_cameras(cameras):
+    if cameras is None:
+        print("Error: Cameras are trying to be closed, but are already closed.")
+        return
     for camera in cameras:
         camera.release()
 

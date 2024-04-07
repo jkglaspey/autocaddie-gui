@@ -29,13 +29,13 @@ def connect_to_device(device_name):
                 return com_port
 
             except serial.SerialException:
-                print(f"Failed to connect to {device_name}")
+                print(f"Error: Failed to connect to {device_name}")
                 return None
         else:
-            print(f"COM port for {device_name} not found")
+            print(f"Debug: COM port for {device_name} not found")
             return None
     else:
-        print(f"{device_name} not found")
+        print(f"Error: {device_name} not found")
         return None
 
 # Done through other files
@@ -47,12 +47,12 @@ def read_data_from_device(ser):
                 line = ser.readline().decode().strip()
 
                 # Print the received data
-                print("Received:", line)
+                print("Debug: Received:", line)
         except KeyboardInterrupt:
             # Close the serial port when Ctrl+C is pressed
             ser.close()
     else:
-        print("No valid serial connection")
+        print("Error No valid serial connection")
 
 def find_com():
     device_name = "HC-06"
@@ -62,5 +62,5 @@ def find_com():
         return com_port
         #read_data_from_device(device_name)
     else:
-        print("Debug: Could not connect to COM!")
+        print("Error: Could not connect to COM!")
         return None

@@ -15,6 +15,8 @@ from algorithms.cv.find_valid_camera_indices import find_camera_indices
 from algorithms.cv.convert_video_to_display import open_cameras, close_cameras, close_camera, get_frame_from_camera
 from cv2 import CAP_PROP_FPS
 import time
+import os
+
 
 # from tkinter import *
 # Explicit imports to satisfy Flake8
@@ -50,11 +52,11 @@ def create_window(width, height, fullscreen, x, y, maximized):
         window.attributes("-fullscreen", True)
     
     # Save window state before closing
-    window.protocol("WM_DELETE_WINDOW", lambda: close_window(window, width, height, x, y, True))
+    window.protocol("WM_DELETE_WINDOW", lambda: close_window(window, width, height, x, y, True, True))
     
     return window
 
-def close_window(window, width, height, x, y, closeBluetooth):
+def close_window(window, width, height, x, y, closeBluetooth, forceShutdown = False):
     if window.attributes("-fullscreen") == 0:
             x, y = get_window_position(window)
     save_window_state(width, height, window.attributes("-fullscreen"), x, y, window.state() == 'zoomed')
@@ -67,6 +69,9 @@ def close_window(window, width, height, x, y, closeBluetooth):
         if cameras is not None:
             close_cameras(cameras)
     window.destroy()
+
+    if forceShutdown:
+        os._exit(1)
 
 def get_window_position(window):
     geometry_string = window.geometry()
@@ -375,7 +380,6 @@ def main():
         while ser_out is None and terminate_bluetooth is False:
             ser_out = start_bluetooth(com, baud)
         connected_bluetooth = True
-        print(f"Connected via {com}")
 
         # Bluetooth is found, show it visually
         text_states["text_3"] = False
