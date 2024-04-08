@@ -81,6 +81,11 @@ def window_event(window):
         return 0, 0
 
 def main(camera_holder_1 = None, camera_holder_2 = None, camera_holder_3 = None, camera_holder_4 = None, ser_out_ref = None, cameras_ref = None):
+    threads = threading.enumerate()
+    print("\n\nAFTER Active Threads:")
+    for thread in threads:
+        print(f"- {thread.name}")
+    
     global ser_out, cameras
     ser_out = ser_out_ref
     cameras = cameras_ref

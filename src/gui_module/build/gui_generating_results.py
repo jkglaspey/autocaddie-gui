@@ -14,6 +14,7 @@ from algorithms.cv.convert_video_to_display import close_cameras
 from PIL import Image, ImageTk
 from data_processing.video_player import VideoPlayer
 from neural_network.process_videos import execute_process_video
+from data_processing.process_imu_data import process_imu_jsons
 import os
 
 # from tkinter import *
@@ -539,8 +540,8 @@ def main(ser_out_ref = None, cameras_ref = None):
         # Create video player objects
         global camera_width, camera_height
         nonlocal video_0, video_1
-        video_0 = VideoPlayer(r"data_processing\video_data\output_3.mp4", canvas, window, rectangle_2, camera_width, camera_height, 0)
-        video_1 = VideoPlayer(r"data_processing\video_data\output_4.mp4", canvas, window, rectangle_3, camera_width, camera_height, 1)
+        video_0 = VideoPlayer(r"data_processing\video_data\output_1.mp4", canvas, window, rectangle_2, camera_width, camera_height, 0)
+        video_1 = VideoPlayer(r"data_processing\video_data\output_2.mp4", canvas, window, rectangle_3, camera_width, camera_height, 1)
         min_time = min(video_0.get_clip_length(), video_1.get_clip_length())
         video_0.set_trim_length(min_time)
         video_1.set_trim_length(min_time)
@@ -603,6 +604,9 @@ def main(ser_out_ref = None, cameras_ref = None):
         # Also, create mp4 files
         video_0.convert_frames_to_video(r"data_processing\video_data\trimmed_out_0.mp4", frames_0)
         video_1.convert_frames_to_video(r"data_processing\video_data\trimmed_out_1.mp4", frames_1)
+
+        # And, process IMU data
+        process_imu_jsons(0.1, 10)
         
         # Now, process with AI!
         execute_process_video(True)
@@ -616,9 +620,9 @@ def main(ser_out_ref = None, cameras_ref = None):
     def calibration_window():
         # ADD TEXT FOR "CLICK BUTTON TO RESTART SWING"
         # Until then, this just takes you back to calibration...
-        from gui_module.build import gui_calibration
+        from gui_module.build import gui_home
         close_window(window, width, height, x, y, False)
-        gui_calibration.main()
+        gui_home.main()
 
     def next_window():
         from gui_module.build import gui_results_main

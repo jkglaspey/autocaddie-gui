@@ -9,7 +9,7 @@ def open_cameras(camera_indices):
         #camera = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
         camera = cv2.VideoCapture(idx)
         if camera.isOpened():
-            #camera.set(cv2.CAP_PROP_FPS, 30)
+            camera.set(cv2.CAP_PROP_FPS, 60)
             cameras.append(camera)
         else:
             print(f"Error: Failed to open camera at index {idx}")

@@ -82,9 +82,13 @@ def window_event(window):
         return 0, 0
 
 def main(camera_holder_1 = None, camera_holder_2 = None, camera_holder_3 = None, camera_holder_4 = None, ser_out_ref = None, cameras_ref = None):
-    global ser_out, cameras
+    global ser_out, cameras, video_1, video_2, video_3, video_4
     ser_out = ser_out_ref
     cameras = cameras_ref
+    video_1 = camera_holder_1
+    video_2 = camera_holder_2
+    video_3 = camera_holder_3
+    video_4 = camera_holder_4
     saved_state = load_window_state()
     width = 0
     height = 0
@@ -136,10 +140,8 @@ def main(camera_holder_1 = None, camera_holder_2 = None, camera_holder_3 = None,
         camera_height = 1
 
     # Globals
-    global terminate, set_frame_1, frame_1, photo_1, cur_cam_idx, pause
+    global terminate, frame_1, photo_1, cur_cam_idx, pause
     terminate = False
-    set_frame_1 = threading.Event()
-    set_frame_2 = threading.Event()
     frame_1 = None
     photo_1 = None
     cur_cam_idx = 0
@@ -150,23 +152,72 @@ def main(camera_holder_1 = None, camera_holder_2 = None, camera_holder_3 = None,
     photo_image_1 = ImageTk.PhotoImage(image_image_1)
     image_1 = canvas.create_image(0, 0, anchor="nw", image=photo_image_1)
 
-    # Video Rectangle
+    # Temp rectangle
     dark_black_image = Image.new("RGB", (370, 240), "#1E1E1E")
     photo_image_dark_black = ImageTk.PhotoImage(dark_black_image)
-    rectangle_1 = canvas.create_image(16, 192, anchor="nw", image=photo_image_dark_black)
-    canvas.rectangle_1 = photo_image_dark_black
-    canvas.rectangle_image_1 = dark_black_image
 
-    # Graph Rectangle
+    # Set rectangle 1
+    rectangle_1 = None
+    canvas.rectangle_1 = None
+    canvas.rectangle_image_1 = None
+    rectangle_1_index = 0
+    def set_rectangle_1():
+        nonlocal rectangle_1, rectangle_1_index
+        if rectangle_1_index == 0:
+            if os.path.exists(r"data_processing\imu_data\quaternion_graph_1.png"):
+                graph_image = Image.open(r"data_processing\imu_data\quaternion_graph_1.png")
+                photo_graph_image = ImageTk.PhotoImage(graph_image)
+                rectangle_1 = canvas.create_image(411, 192, anchor="nw", image=photo_graph_image)
+                canvas.rectangle_1 = photo_graph_image
+                canvas.rectangle_image_1 = graph_image
+            else:
+                rectangle_1 = canvas.create_image(411, 192, anchor="nw", image=photo_image_dark_black)
+                canvas.rectangle_1 = photo_image_dark_black
+                canvas.rectangle_image_1 = dark_black_image
+        elif rectangle_1_index == 1:
+            if os.path.exists(r"data_processing\imu_data\roll_graph_1.png"):
+                graph_image = Image.open(r"data_processing\imu_data\roll_graph_1.png")
+                photo_graph_image = ImageTk.PhotoImage(graph_image)
+                rectangle_1 = canvas.create_image(411, 192, anchor="nw", image=photo_graph_image)
+                canvas.rectangle_1 = photo_graph_image
+                canvas.rectangle_image_1 = graph_image
+            else:
+                rectangle_1 = canvas.create_image(411, 192, anchor="nw", image=photo_image_dark_black)
+                canvas.rectangle_1 = photo_image_dark_black
+                canvas.rectangle_image_1 = dark_black_image
+        elif rectangle_1_index == 2:
+            if os.path.exists(r"data_processing\imu_data\pitch_graph_1.png"):
+                graph_image = Image.open(r"data_processing\imu_data\pitch_graph_1.png")
+                photo_graph_image = ImageTk.PhotoImage(graph_image)
+                rectangle_1 = canvas.create_image(411, 192, anchor="nw", image=photo_graph_image)
+                canvas.rectangle_1 = photo_graph_image
+                canvas.rectangle_image_1 = graph_image
+            else:
+                rectangle_1 = canvas.create_image(411, 192, anchor="nw", image=photo_image_dark_black)
+                canvas.rectangle_1 = photo_image_dark_black
+                canvas.rectangle_image_1 = dark_black_image
+        else:
+            if os.path.exists(r"data_processing\imu_data\yaw_graph_1.png"):
+                graph_image = Image.open(r"data_processing\imu_data\yaw_graph_1.png")
+                photo_graph_image = ImageTk.PhotoImage(graph_image)
+                rectangle_1 = canvas.create_image(411, 192, anchor="nw", image=photo_graph_image)
+                canvas.rectangle_1 = photo_graph_image
+                canvas.rectangle_image_1 = graph_image
+            else:
+                rectangle_1 = canvas.create_image(411, 192, anchor="nw", image=photo_image_dark_black)
+                canvas.rectangle_1 = photo_image_dark_black
+                canvas.rectangle_image_1 = dark_black_image
+
+    # Set rectangle 2
     rectangle_2 = None
     canvas.rectangle_2 = None
     canvas.rectangle_image_2 = None
-    def put_graph():
-        nonlocal rectangle_2, canvas
-        global cur_cam_idx
-        if cur_cam_idx == 0:
-            if os.path.exists(r"neural_network\graphs\trimmed_out_0_angle_arm_act.png"):
-                graph_image = Image.open(r"neural_network\graphs\trimmed_out_0_angle_arm_act.png")
+    rectangle_2_index = 0
+    def set_rectangle_2():
+        nonlocal rectangle_2, rectangle_2_index
+        if rectangle_2_index == 0:
+            if os.path.exists(r"data_processing\imu_data\quaternion_graph_2.png"):
+                graph_image = Image.open(r"data_processing\imu_data\quaternion_graph_2.png")
                 photo_graph_image = ImageTk.PhotoImage(graph_image)
                 rectangle_2 = canvas.create_image(411, 192, anchor="nw", image=photo_graph_image)
                 canvas.rectangle_2 = photo_graph_image
@@ -175,9 +226,9 @@ def main(camera_holder_1 = None, camera_holder_2 = None, camera_holder_3 = None,
                 rectangle_2 = canvas.create_image(411, 192, anchor="nw", image=photo_image_dark_black)
                 canvas.rectangle_2 = photo_image_dark_black
                 canvas.rectangle_image_2 = dark_black_image
-        elif cur_cam_idx == 1:
-            if os.path.exists(r"neural_network\graphs\trimmed_out_1_angle_arm_act.png"):
-                graph_image = Image.open(r"neural_network\graphs\trimmed_out_1_angle_arm_act.png")
+        elif rectangle_2_index == 1:
+            if os.path.exists(r"data_processing\imu_data\roll_graph_2.png"):
+                graph_image = Image.open(r"data_processing\imu_data\roll_graph_2.png")
                 photo_graph_image = ImageTk.PhotoImage(graph_image)
                 rectangle_2 = canvas.create_image(411, 192, anchor="nw", image=photo_graph_image)
                 canvas.rectangle_2 = photo_graph_image
@@ -186,9 +237,9 @@ def main(camera_holder_1 = None, camera_holder_2 = None, camera_holder_3 = None,
                 rectangle_2 = canvas.create_image(411, 192, anchor="nw", image=photo_image_dark_black)
                 canvas.rectangle_2 = photo_image_dark_black
                 canvas.rectangle_image_2 = dark_black_image
-        elif cur_cam_idx == 2:
-            if os.path.exists(r"neural_network\graphs\skeleton_video0_angle_arm_pred.png"):
-                graph_image = Image.open(r"neural_network\graphs\skeleton_video0_angle_arm_pred.png")
+        elif rectangle_2_index == 2:
+            if os.path.exists(r"data_processing\imu_data\pitch_graph_2.png"):
+                graph_image = Image.open(r"data_processing\imu_data\pitch_graph_2.png")
                 photo_graph_image = ImageTk.PhotoImage(graph_image)
                 rectangle_2 = canvas.create_image(411, 192, anchor="nw", image=photo_graph_image)
                 canvas.rectangle_2 = photo_graph_image
@@ -197,9 +248,9 @@ def main(camera_holder_1 = None, camera_holder_2 = None, camera_holder_3 = None,
                 rectangle_2 = canvas.create_image(411, 192, anchor="nw", image=photo_image_dark_black)
                 canvas.rectangle_2 = photo_image_dark_black
                 canvas.rectangle_image_2 = dark_black_image
-        elif cur_cam_idx == 3:
-            if os.path.exists(r"neural_network\graphs\skeleton_video1_angle_arm_pred.png"):
-                graph_image = Image.open(r"neural_network\graphs\skeleton_video1_angle_arm_pred.png")
+        else:
+            if os.path.exists(r"data_processing\imu_data\yaw_graph_2.png"):
+                graph_image = Image.open(r"data_processing\imu_data\yaw_graph_2.png")
                 photo_graph_image = ImageTk.PhotoImage(graph_image)
                 rectangle_2 = canvas.create_image(411, 192, anchor="nw", image=photo_graph_image)
                 canvas.rectangle_2 = photo_graph_image
@@ -208,7 +259,15 @@ def main(camera_holder_1 = None, camera_holder_2 = None, camera_holder_3 = None,
                 rectangle_2 = canvas.create_image(411, 192, anchor="nw", image=photo_image_dark_black)
                 canvas.rectangle_2 = photo_image_dark_black
                 canvas.rectangle_image_2 = dark_black_image
-    put_graph()
+
+    set_rectangle_1()
+    set_rectangle_2()
+
+    # Load reference RPY image
+    reference_image = Image.open(relative_to_assets("reference_rpy.png"))
+    photo_reference_image = ImageTk.PhotoImage(reference_image)
+    reference_image_obj = canvas.create_image(canvas_width * 0.5, canvas_height * 0.28, anchor="center", image=photo_reference_image)
+    canvas.reference_image = photo_reference_image
 
     # White text rectangle
     rectangle_3 = canvas.create_rectangle(
@@ -277,33 +336,6 @@ def main(camera_holder_1 = None, camera_holder_2 = None, camera_holder_3 = None,
     #)
     button_2.place(relx = 0.882, rely = 0.187, anchor="center")
 
-    # Slider
-    slider = None
-    def create_slider():
-        nonlocal slider, rectangle_1
-        global cur_cam_idx, video_1, video_2, video_3, video_4
-
-        # Destroy the existing slider
-        if slider is not None:
-            slider.destroy()
-            slider = None
-
-        if cur_cam_idx == 0 and video_1 is not None:
-            slider = ttk.Scale(window, from_=0, to=video_1.numFrames - 1, value=0, orient=tk.HORIZONTAL, command=lambda value: slider_update_video(*video_1.getFrame(int(float(value))), int(float(value))))
-        elif cur_cam_idx == 1 and video_2 is not None:
-            slider = ttk.Scale(window, from_=0, to=video_2.numFrames - 1, value=0, orient=tk.HORIZONTAL, command=lambda value: slider_update_video(*video_2.getFrame(int(float(value))), int(float(value))))
-        elif cur_cam_idx == 2 and video_3 is not None:
-            slider = ttk.Scale(window, from_=0, to=video_3.numFrames - 1, value=0, orient=tk.HORIZONTAL, command=lambda value: slider_update_video(*video_3.getFrame(int(float(value))), int(float(value))))
-        elif cur_cam_idx == 3 and video_4 is not None:
-            slider = ttk.Scale(window, from_=0, to=video_4.numFrames - 1, value=0, orient=tk.HORIZONTAL, command=lambda value: slider_update_video(*video_4.getFrame(int(float(value))), int(float(value))))
-
-        if slider is not None:
-            global canvas_width, canvas_height
-            slider_width = canvas_width // 2
-            slider_x = canvas_width // 4
-            slider_y = canvas_height * 0.35
-            slider.place(x=slider_x, y=slider_y, width=slider_width)
-
     # Resize background image
     def resize_background(event=None):
 
@@ -337,8 +369,7 @@ def main(camera_holder_1 = None, camera_holder_2 = None, camera_holder_3 = None,
         resize_background()
 
         # Rectangles
-        nonlocal rectangle_1
-        new_cords = [canvas_width * 0.287, canvas_height * 0.107, canvas_width * 0.713, canvas_height * 0.252]
+        new_cords = [canvas_width * 0.287, canvas_height * 0.03, canvas_width * 0.713, canvas_height * 0.15]
         canvas.coords(rectangle_3, *new_cords)
 
         # Text
@@ -372,31 +403,10 @@ def main(camera_holder_1 = None, camera_holder_2 = None, camera_holder_3 = None,
         photo_rectangle_image = ImageTk.PhotoImage(resized_rectangle)
         canvas.itemconfig(rectangle_2, image = photo_rectangle_image)
         canvas.rectangle_2 = photo_rectangle_image
-        global pause
-        if pause:
-            resized_rectangle = canvas.rectangle_image_1.resize((camera_width, camera_height))
-            photo_rectangle_image = ImageTk.PhotoImage(resized_rectangle)
-            canvas.itemconfig(rectangle_1, image = photo_rectangle_image)
-            canvas.rectangle_1 = photo_rectangle_image
-
-        # Slider
-        nonlocal slider
-        if slider is not None:
-            slider_width = canvas_width // 2
-            slider_x = canvas_width // 4
-            slider_y = canvas_height * 0.35
-            slider.place(x=slider_x, y=slider_y, width=slider_width)
-
-        # Cameras?
-        global video_1, video_2, video_3, video_4
-        if video_1:
-            video_1.set_dims(camera_width, camera_height)
-        if video_2:
-            video_2.set_dims(camera_width, camera_height)
-        if video_3:
-            video_3.set_dims(camera_width, camera_height)
-        if video_4:
-            video_4.set_dims(camera_width, camera_height)
+        resized_rectangle = canvas.rectangle_image_1.resize((camera_width, camera_height))
+        photo_rectangle_image = ImageTk.PhotoImage(resized_rectangle)
+        canvas.itemconfig(rectangle_1, image = photo_rectangle_image)
+        canvas.rectangle_1 = photo_rectangle_image
 
         # Button 1
         button_1_width = (int)(canvas_width * 0.115)
@@ -413,127 +423,40 @@ def main(camera_holder_1 = None, camera_holder_2 = None, camera_holder_3 = None,
         button_image_2 = ImageTk.PhotoImage(resized_button_image_2)
         button_2.config(image=button_image_2)
         button_2.image = button_image_2
+
+        # Reference image
+        reference_image = Image.open(relative_to_assets("reference_rpy.png")).resize((int(canvas_width * 0.3), int(canvas_height * 0.2)))
+        photo_reference_image = ImageTk.PhotoImage(reference_image)
+        canvas.itemconfig(reference_image_obj, image=photo_reference_image)
+        canvas.reference_image = photo_reference_image
+        canvas.coords(reference_image_obj, canvas_width * 0.5, canvas_height * 0.28)
     
     # Bind resizing events
     canvas.bind("<Configure>", resize_canvas)
 
-    def switch_cameras(event):
-        # See if this is an unpause action
-        global pause
-        if pause:
-            pause = False
-            return
-
-        # Swap cameras
-        global cur_cam_idx, cur_frame
-        cur_cam_idx += 1
-        if cur_cam_idx == 4:
-            cur_cam_idx = 0
-
-        # Swap sliders
-        create_slider()
-
-        # Swap graphs
-        put_graph()
-
-        # Fix sizes
+    def switch_quat_1(event):
+        nonlocal rectangle_1_index
+        rectangle_1_index += 1
+        if rectangle_1_index == 4:
+            rectangle_1_index = 0
+        canvas.tag_unbind(rectangle_1, "<Button-1>")
+        set_rectangle_1()
         resize_canvas()
+        canvas.tag_bind(rectangle_1, "<Button-1>", switch_quat_1)
+
+    def switch_quat_2(event):
+        nonlocal rectangle_2_index
+        rectangle_2_index += 1
+        if rectangle_2_index == 4:
+            rectangle_2_index = 0
+        canvas.tag_unbind(rectangle_2, "<Button-1>")
+        set_rectangle_2()
+        resize_canvas()
+        canvas.tag_bind(rectangle_2, "<Button-1>", switch_quat_2)
 
     # Bind click events to the rectangles
-    canvas.tag_bind(rectangle_1, "<Button-1>", switch_cameras)
-    canvas.tag_bind(rectangle_2, "<Button-1>", switch_cameras)
-
-    # Thread to initialize camera feeds
-    def initialize_camera_holders():
-
-        # Initialize the camera holders
-        global video_1, video_2, video_3, video_4, camera_width, camera_height
-        if camera_holder_1 is None or camera_holder_2 is None or camera_holder_3 is None or camera_holder_4 is None:
-            video_1 = CameraHolder(r"neural_network\angle_videos\amateur_cam_analysis0.mp4")
-            video_2 = CameraHolder(r"neural_network\angle_videos\amateur_cam_analysis1.mp4")
-            video_3 = CameraHolder(r"neural_network\angle_videos\amateur_swing_analysis0.mp4")
-            video_4 = CameraHolder(r"neural_network\angle_videos\amateur_swing_analysis1.mp4")
-            video_1.set_dims(camera_width, camera_height)
-            video_2.set_dims(camera_width, camera_height)
-            video_3.set_dims(camera_width, camera_height)
-            video_4.set_dims(camera_width, camera_height)
-            video_1.open_camera()
-            video_2.open_camera()
-            video_3.open_camera()
-            video_4.open_camera()
-        else:
-            video_1 = camera_holder_1
-            video_2 = camera_holder_2
-            video_3 = camera_holder_3
-            video_4 = camera_holder_4
-
-        # Create a thread to loop for the camera
-        video_1_thread = threading.Thread(target = update_video_loop)
-        video_1_thread.start()
-
-        # Create a slider
-        window.after(0, lambda: create_slider())
-    
-    def update_video_loop():
-        global terminate, video_1, video_2, video_3, video_4, fps, cur_frame, cur_cam_idx, pause
-        cur_frame = 0
-        while not terminate:
-            if cur_cam_idx == 0:
-                # Get from video 1
-                if video_1 is not None and pause is False:
-                    frame, photo = video_1.getFrame(cur_frame)
-                    cur_frame += 1
-                    if cur_frame == video_1.numFrames:
-                        cur_frame = 0
-                    if frame is not None:
-                        window.after(0, update_video(frame, photo))
-                time.sleep(1 / video_1.fps + 0.01)
-            elif cur_cam_idx == 1:
-                # Get from video 2
-                if video_2 is not None and pause is False:
-                    frame, photo = video_2.getFrame(cur_frame)
-                    cur_frame += 1
-                    if cur_frame == video_2.numFrames:
-                        cur_frame = 0
-                    if frame is not None:
-                        window.after(0, update_video(frame, photo))
-                time.sleep(1 / video_2.fps + 0.01)
-            elif cur_cam_idx == 2:
-                # Get from video 3
-                if video_3 is not None and pause is False:
-                    frame, photo = video_3.getFrame(cur_frame)
-                    cur_frame += 1
-                    if cur_frame == video_3.numFrames:
-                        cur_frame = 0
-                    if frame is not None:
-                        window.after(0, update_video(frame, photo))
-                time.sleep(1 / video_3.fps + 0.01)
-            else:
-                # Get from video 4
-                if video_4 is not None and pause is False:
-                    frame, photo = video_4.getFrame(cur_frame)
-                    cur_frame += 1
-                    if cur_frame == video_4.numFrames:
-                        cur_frame = 0
-                    if frame is not None:
-                        window.after(0, update_video(frame, photo))
-                time.sleep(1 / video_4.fps + 0.01)
-    
-    def update_video(frame, photo):
-        global terminate
-        if not terminate:
-            canvas.itemconfig(rectangle_1, image=photo)
-            canvas.rectangle_1 = photo
-            canvas.rectangle_image_1 = frame
-
-    def slider_update_video(frame, photo, idx):
-        global pause
-        if not pause:
-            pause = True
-        if idx != -1:
-            global cur_frame
-            cur_frame = idx
-        window.after(0,update_video(frame, photo))
+    canvas.tag_bind(rectangle_1, "<Button-1>", switch_quat_1)
+    canvas.tag_bind(rectangle_2, "<Button-1>", switch_quat_2)
 
     def wait_for_ser_out():
         global terminate, ser_out
@@ -573,8 +496,6 @@ def main(camera_holder_1 = None, camera_holder_2 = None, camera_holder_3 = None,
         gui_results_arm.main(video_1, video_2, video_3, video_4, ser_out, cameras)
 
     # Start threads
-    start_camera_objects = threading.Thread(target = initialize_camera_holders)
-    start_camera_objects.start()
     listen_for_button = threading.Thread(target = wait_for_ser_out)
     listen_for_button.start()
     window.mainloop()

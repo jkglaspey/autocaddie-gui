@@ -44,13 +44,13 @@ class CameraRecorder(threading.Thread):
                 print(f"Error: Missed a frame on cam #{self.idx}")
         self.stop_recording()
 
-    def start_recording(self, recorder, output_file, parm_fps=30):
+    def start_recording(self, recorder, output_file, parm_fps=60):
         fps = recorder.get(cv2.CAP_PROP_FPS)
         print(f"Debug: Recording at FPS = {fps}")
         width = int(recorder.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(recorder.get(cv2.CAP_PROP_FRAME_HEIGHT))
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        out = cv2.VideoWriter(output_file, fourcc, fps, (width, height))
+        out = cv2.VideoWriter(output_file, fourcc, parm_fps, (width, height))
         return recorder, out
 
     def stop_recording(self):
