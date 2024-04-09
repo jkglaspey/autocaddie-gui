@@ -27,9 +27,14 @@ def receive_imu_data(ser_out):
             continue
 
         # Record prep data
+        curTime = time.time()
         if line == "PREP":
+            #print("\n\nFOUND PREP LINE!\n\n")
             images = []
             while terminate_bluetooth is False and line != "SWING":
+                #newTime = time.time()
+                #print(f"Time between calls: {newTime - curTime}")
+                #curTime = newTime
 
                 # Scan in 2 lines of input. Test each to see if order messed up
                 line = receive_packet(ser_out)
@@ -48,9 +53,13 @@ def receive_imu_data(ser_out):
         
         # Record swing data
         if line == "SWING":
+            #print("\n\nFOUND SWING LINE!\n\n")
             gui_recording.notify_start_videos()
             while terminate_bluetooth is False and line != "END":
 
+                #newTime = time.time()
+                #print(f"Time between calls: {newTime - curTime}")
+                #curTime = newTime
                 # Scan in 2 lines of input. Test each to see if order messed up
                 line = receive_packet(ser_out)
                 if line == "END":
@@ -68,13 +77,11 @@ def receive_imu_data(ser_out):
 
         # End the recording
         if line == "END":
+            #print("\n\nFOUND END LINE!\n\n")
 
             # Are we good to dump the data?
             if terminate_bluetooth is True:
                 return
-            
-            # Save the images
-            gui_recording.notify_end_videos()
 
             # Write prep data for Q1
             with open(r"data_processing\imu_data\prep_data_q1.json", 'w') as f:

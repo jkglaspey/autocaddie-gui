@@ -468,12 +468,11 @@ def main():
         if not terminate_bluetooth:
             window.after(1, start_updating_cameras)  # 1 milisecond
 
-        # Select the first 2 camera feeds in the list
-        #video_stream_1 = capture_camera(camera_indices[0])
-        #video_stream_2 = capture_camera(camera_indices[1])
-
     # Container method for updating camera feeds      
     def start_updating_cameras():
+        # Join a thread to clean up resources
+        nonlocal camera_thread
+        camera_thread.join()
         canvas.delete(text_1)
         canvas.delete(text_4)
         text_states["text_1"] = False
@@ -510,7 +509,7 @@ def main():
     
     def update_camera_feeds():
         global terminate_bluetooth
-        if not terminate_bluetooth:
+        if terminate_bluetooth is False:
             global camera_width, camera_height, cameras
             global cur_cam_1_idx, cur_cam_2_idx, fps_delay
             captured_frame = get_frame_from_camera(cameras[cur_cam_1_idx], camera_width, camera_height)
@@ -522,14 +521,18 @@ def main():
                 canvas.itemconfig(rectangle_2, image=captured_frame)
                 canvas.rectangle_2 = captured_frame  # Prevent garbage collection
                 canvas.coords(rectangle_2, canvas_width * 0.517, canvas_height * 0.429)
-            if window.winfo_exists():
+            if terminate_bluetooth is False and window.winfo_exists():
                 window.after(fps_delay, lambda: update_camera_feeds() if window.winfo_exists() else None)  # 60 FPS
 
     # Move to the recording frame
     def next_window():
+        # Join bluetooth thread
+        nonlocal bluetooth_thread
+        bluetooth_thread.join()
         print("Debug: Calibration Succeeded.")
 
         # Start data recording process
+        # JOINED
         data_thread = threading.Thread(target = receive_imu_data, args=(ser_out,))
         data_thread.start()
 
@@ -537,7 +540,7 @@ def main():
         close_window(window, width, height, x, y, False)
         global cur_cam_1_idx, cur_cam_2_idx, cameras
         close_unused_cameras()
-        gui_recording.main(ser_out, cameras[cur_cam_1_idx], cameras[cur_cam_2_idx])
+        gui_recording.main(ser_out, cameras[cur_cam_1_idx], cameras[cur_cam_2_idx], data_thread)
     
     def close_unused_cameras():
         global cameras, cur_cam_1_idx, cur_cam_2_idx, connected_cameras
@@ -550,6 +553,7 @@ def main():
         
 
     # Start the camera finding on a separate thread
+    # JOINED
     camera_thread = threading.Thread(target = start_cameras)
     camera_thread.start()
 

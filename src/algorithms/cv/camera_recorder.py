@@ -13,7 +13,8 @@ class CameraRecorder(threading.Thread):
         self.width = width
         self.height = height
         self.idx = idx
-    
+        self.thread = None
+
     def keep_reference(self, window, canvas, rectangle):
         self.window = window
         self.canvas = canvas
@@ -27,6 +28,7 @@ class CameraRecorder(threading.Thread):
         self.save = True
 
     def run(self):
+        self.thread = threading.current_thread()
         recorder, video_writer = self.start_recording(self.camera, self.output_files)
         self.video_writer = video_writer
         self.is_running = True
@@ -58,7 +60,7 @@ class CameraRecorder(threading.Thread):
         self.save = False
         #self.camera.release()
         self.video_writer.release()
-    
+
     def send_frame_to_gui(self, frame, idx):
         from gui_module.build.gui_recording import update_camera_feed
         opencv_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -83,7 +85,6 @@ def start_saving(recorder_thread):
 
 def stop_saving(recorder_thread):
     recorder_thread.save = False
-
 
 if __name__ == "__main__":
     pass

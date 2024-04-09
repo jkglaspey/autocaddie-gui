@@ -7,7 +7,7 @@ from pathlib import Path
 import json
 import threading
 import time
-from data_processing.serial_bluetooth_communication import stop_bluetooth, receive_packet_async
+from data_processing.serial_bluetooth_communication import stop_bluetooth, receive_packet_async, clear_buffer
 from algorithms.cv.convert_video_to_display import close_cameras
 from data_processing.record_imu import receive_imu_data
 from PIL import Image, ImageTk
@@ -81,10 +81,6 @@ def window_event(window):
         return 0, 0
 
 def main(camera_holder_1 = None, camera_holder_2 = None, camera_holder_3 = None, camera_holder_4 = None, ser_out_ref = None, cameras_ref = None):
-    threads = threading.enumerate()
-    print("\n\nAFTER Active Threads:")
-    for thread in threads:
-        print(f"- {thread.name}")
     
     global ser_out, cameras
     ser_out = ser_out_ref
@@ -390,6 +386,7 @@ def main(camera_holder_1 = None, camera_holder_2 = None, camera_holder_3 = None,
     
     def wait_for_ser_out():
         global terminate, ser_out
+        clear_buffer(ser_out)
         while terminate is False:
             line = receive_packet_async(ser_out)
             
@@ -398,7 +395,8 @@ def main(camera_holder_1 = None, camera_holder_2 = None, camera_holder_3 = None,
                 continue
 
             # We got liftoff!
-            window.after(0, click_recording_button)
+            if line == "READY":
+                window.after(0, click_recording_button)
     
     # Switch to the recording gui
     def click_recording_button():
@@ -411,7 +409,7 @@ def main(camera_holder_1 = None, camera_holder_2 = None, camera_holder_3 = None,
         # Next window
         from gui_module.build import gui_recording
         close_window(window, width, height, x, y, False)
-        gui_recording.main(ser_out, cameras[0], cameras[1])
+        gui_recording.main(ser_out, cameras[0], cameras[1], data_thread)
 
     # Switch to right GUI
     def click_right_button():

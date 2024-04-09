@@ -62,10 +62,6 @@ def window_event(window):
         return 0, 0
 
 def main():
-    threads = threading.enumerate()
-    print("\n\nAFTER Active Threads:")
-    for thread in threads:
-        print(f"- {thread.name}")
     saved_state = load_window_state()
     width = 0
     height = 0

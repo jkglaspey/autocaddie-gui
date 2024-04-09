@@ -82,10 +82,6 @@ def window_event(window):
         return 0, 0
 
 def main(camera_holder_1 = None, camera_holder_2 = None, camera_holder_3 = None, camera_holder_4 = None, ser_out_ref = None, cameras_ref = None):
-    threads = threading.enumerate()
-    print("\n\nAFTER Active Threads:")
-    for thread in threads:
-        print(f"- {thread.name}")
     global ser_out, cameras
     ser_out = ser_out_ref
     cameras = cameras_ref
@@ -552,7 +548,8 @@ def main(camera_holder_1 = None, camera_holder_2 = None, camera_holder_3 = None,
                 continue
 
             # We got liftoff!
-            window.after(0, click_recording_button)
+            if line == "READY":
+                window.after(0, click_recording_button)
     
     # Switch to the recording gui
     def click_recording_button():
@@ -565,7 +562,7 @@ def main(camera_holder_1 = None, camera_holder_2 = None, camera_holder_3 = None,
         # Next window
         from gui_module.build import gui_recording
         close_window(window, width, height, x, y, False)
-        gui_recording.main(ser_out, cameras[0], cameras[1])
+        gui_recording.main(ser_out, cameras[0], cameras[1], data_thread)
         
     def click_left_button():
         global video_1, video_2, video_3, video_4, ser_out, cameras

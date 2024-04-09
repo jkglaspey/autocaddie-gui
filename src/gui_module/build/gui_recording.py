@@ -141,11 +141,7 @@ def stop_recording_thread(recorder_thread_0, recorder_thread_1):
         stop_recording(recorder_thread_1)
         del recorder_thread_1
 
-def main(ser_out_ref, camera_1, camera_2):
-    threads = threading.enumerate()
-    print("\n\nAFTER Active Threads:")
-    for thread in threads:
-        print(f"- {thread.name}")
+def main(ser_out_ref, camera_1, camera_2, imu_recording_thread_ref):
     global ser_out
     ser_out = ser_out_ref
 
@@ -409,7 +405,15 @@ def main(ser_out_ref, camera_1, camera_2):
 
     recorder_thread_0 = None
     recorder_thread_1 = None
+    imu_recording_thread = imu_recording_thread_ref
     def start_recording_local():
+        ##########################################
+        #threads = threading.enumerate()
+        #print("\n\n\n----->   BEGINNING RECORDING LOCALLY |||  Active Threads: <-----")
+        #for thread in threads:
+        #    print(f"- {thread.name}")
+        #print("----------------------------------------")
+        ##########################################
 
         # Start recording
         nonlocal recorder_thread_0, recorder_thread_1
@@ -422,12 +426,29 @@ def main(ser_out_ref, camera_1, camera_2):
         # Call the camera to stop recording
         stop_recording_thread(recorder_thread_0, recorder_thread_1)
 
+        ##########################################
+        #threads = threading.enumerate()
+        #print("\n\n\n----->   ENDING RECORDING LOCALLY |||  Active Threads: <-----")
+        #for thread in threads:
+        #    print(f"- {thread.name}")
+        #print("----------------------------------------")
+        ##########################################
+
         # Cameras finished! Give 1 second, then set variable
         time.sleep(1)
+        nonlocal imu_recording_thread
+        imu_recording_thread.join()
         end_thread.start()
         notify_end_videos()
 
     def initialize_camera_thread():
+        ##########################################
+        #threads = threading.enumerate()
+        #print("\n\n\n----->   RECORDING: INITIALIZE CAMERA THREAD IS CALLED |||  Active Threads: <-----")
+        #for thread in threads:
+        #    print(f"- {thread.name}")
+        #print("----------------------------------------")
+        ##########################################
         nonlocal recorder_thread_0, recorder_thread_1
         global camera_width, camera_height
         recorder_thread_0, recorder_thread_1 = start_recording_thread(recorder_thread_0, recorder_thread_1, camera_1, camera_2, camera_width, camera_height)
@@ -438,6 +459,7 @@ def main(ser_out_ref, camera_1, camera_2):
             start_recording_event.wait()
         start_recording_local()
 
+    # JOINED
     record_camera_thread = threading.Thread(target = initialize_camera_thread)
     record_camera_thread.start()
 
@@ -446,9 +468,14 @@ def main(ser_out_ref, camera_1, camera_2):
         while not finish_recording:
             end_event.wait()
         window.after(0,next_window)
+    # JOINED
     end_thread = threading.Thread(target = wait_to_end)
 
     def next_window():
+        # Join open threads
+        nonlocal record_camera_thread, end_thread
+        record_camera_thread.join()
+        end_thread.join()
         global ser_out, cameras
         # No longer closing cameras between runs
         # close_cameras(cameras)

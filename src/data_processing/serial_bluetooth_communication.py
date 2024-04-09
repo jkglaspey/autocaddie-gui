@@ -44,6 +44,10 @@ def receive_packet(ser_out):
         print(f"Error: {e}")
         return None
     
+def clear_buffer(ser_out):
+    if ser_out is not None:
+        ser_out.reset_input_buffer()
+
 def receive_packet_async(ser_out):
     global connection_in_progress
     try:
